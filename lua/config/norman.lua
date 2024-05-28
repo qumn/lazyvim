@@ -14,8 +14,7 @@ del({ "n", "t" }, "<C-l>")
 del("x", "i")
 del("x", "in")
 del("x", "il")
-del("n", "yi")
-del("n", "ya")
+del("n", "yÞ")
 del("n", "yiÞ")
 del("n", "yaÞ")
 del("n", "y")
@@ -86,3 +85,19 @@ vim.cmd([[
   autocmd TermEnter term://*toggleterm#*
         \ tnoremap <silent><C-t> <Cmd>exe v:count1 . "ToggleTerm"<CR>
 ]])
+
+vim.keymap.set("n", "n", function()
+  if vim.v.count > 0 then
+    return "m'" .. vim.v.count .. "j"
+  else
+    return "gj"
+  end
+end, { noremap = true, expr = true })
+
+vim.keymap.set("n", "i", function()
+  if vim.v.count > 0 then
+    return "m'" .. vim.v.count .. "k"
+  else
+    return "gk"
+  end
+end, { noremap = true, expr = true })
