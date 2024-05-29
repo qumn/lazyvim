@@ -67,10 +67,10 @@ vim.cmd([[
   nnoremap <C-w>i <C-w>k
   nnoremap <C-w>o <C-w>l
 
-  nnoremap <C-y> <C-w>h
-  nnoremap <C-n> <C-w>j
-  nnoremap <C-i> <C-w>k
-  nnoremap <C-o> <C-w>l
+  " nnoremap <C-y> <C-w>h
+  " nnoremap <C-n> <C-w>j
+  " nnoremap <C-i> <C-w>k
+  " nnoremap <C-o> <C-w>l
 
   xnoremap p pgvy
 
