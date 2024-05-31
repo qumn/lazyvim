@@ -10,30 +10,18 @@ return {
         desc = "Find Plugin File",
       },
     },
-    -- change some options
-    opts = {
-      defaults = {
-        layout_strategy = "horizontal",
-        layout_config = { prompt_position = "top" },
-        sorting_strategy = "ascending",
-        winblend = 0,
-      },
-    },
-    config = function()
+    opts = function(_, opts)
       local actions = require("telescope.actions")
-      local prev = "<C-i>"
-      require("telescope").setup({
+      local prev = "<C-" .. vim.g.upkey .. ">"
+      return vim.tbl_extend("force", opts, {
         defaults = {
-          -- layout_config = {
-          --   horizontal = { prompt_position = 'top', results_width = 0.6 },
-          --   vertical = { mirror = false },
-          -- },
           theme = "ivy",
           sorting_strategy = "ascending",
           layout_strategy = "bottom_pane",
           layout_config = {
             height = 0.5,
           },
+
           border = true,
           borderchars = {
             prompt = { "─", " ", " ", " ", "─", "─", " ", " " },
@@ -43,6 +31,12 @@ return {
           file_previewer = require("telescope.previewers").vim_buffer_cat.new,
           grep_previewer = require("telescope.previewers").vim_buffer_vimgrep.new,
           qflist_previewer = require("telescope.previewers").vim_buffer_qflist.new,
+          winblend = 0,
+          path_display = {
+            filename_first = {
+              reverse_directories = true,
+            },
+          },
           mappings = {
             i = {
               ["<C-s>"] = actions.select_horizontal,
