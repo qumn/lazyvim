@@ -18,3 +18,19 @@ vim.api.nvim_create_autocmd("ModeChanged", {
     end
   end,
 })
+
+vim.api.nvim_create_autocmd("InsertEnter", {
+  pattern = "*",
+  callback = function()
+    -- vim.lsp.inlay_hint.enable(false)
+    LazyVim.toggle.inlay_hints(vim.api.nvim_get_current_buf(), false)
+  end,
+})
+
+vim.api.nvim_create_autocmd("InsertLeave", {
+  pattern = "*",
+  callback = function()
+    -- vim.lsp.inlay_hint.enable(true)
+    LazyVim.toggle.inlay_hints(vim.api.nvim_get_current_buf(), true)
+  end,
+})
