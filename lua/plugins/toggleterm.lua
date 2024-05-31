@@ -4,7 +4,7 @@ return {
   keys = { "<C-t>" },
   opts = {
     open_mapping = [[<C-t>]],
-    shell = "/bin/bash",
+    shell = "/bin/zsh",
   },
   init = function()
     vim.cmd([[
