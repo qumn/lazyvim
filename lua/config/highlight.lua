@@ -91,12 +91,4 @@ function M.load_syntax()
   end
 end
 
-vim.api.nvim_create_autocmd({ "VimEnter", "ColorScheme" }, {
-  group = vim.api.nvim_create_augroup("Color", {}),
-  pattern = "*",
-  callback = function()
-    require("core.highlight").load_syntax()
-  end,
-})
-
 return M

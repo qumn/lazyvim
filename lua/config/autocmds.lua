@@ -34,3 +34,28 @@ vim.api.nvim_create_autocmd("InsertLeave", {
     LazyVim.toggle.inlay_hints(vim.api.nvim_get_current_buf(), true)
   end,
 })
+
+vim.api.nvim_create_autocmd({ "ColorScheme" }, {
+  group = vim.api.nvim_create_augroup("Color", {}),
+  pattern = "*",
+  callback = function()
+    -- local colorscheme = vim.g.colors_name
+    -- print(string.format("colorscheme %s", colorscheme))
+    require("config.highlight").load_syntax()
+  end,
+})
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "VeryLazy",
+  once = true,
+  callback = function()
+    -- local colorscheme = vim.g.colors_name
+    -- print(string.format("colorscheme %s", colorscheme))
+    print("VeryLazy event fired")
+    require("config.highlight").load_syntax()
+  end,
+})
+
+LazyVim.on_very_lazy(function()
+  print("VeryLazy event fired")
+end)
