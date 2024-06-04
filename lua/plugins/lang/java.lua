@@ -1,8 +1,6 @@
 return {
   {
     "mfussenegger/nvim-jdtls",
-    ---@type lspconfig.options.jdtls
-    ---@diagnostic disable-next-line: missing-fields
     opts = {
       jdtls = function(opts)
         local install_path = require("mason-registry").get_package("jdtls"):get_install_path()

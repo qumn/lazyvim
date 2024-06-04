@@ -44,18 +44,3 @@ vim.api.nvim_create_autocmd({ "ColorScheme" }, {
     require("config.highlight").load_syntax()
   end,
 })
-
-vim.api.nvim_create_autocmd("User", {
-  pattern = "VeryLazy",
-  once = true,
-  callback = function()
-    -- local colorscheme = vim.g.colors_name
-    -- print(string.format("colorscheme %s", colorscheme))
-    print("VeryLazy event fired")
-    require("config.highlight").load_syntax()
-  end,
-})
-
-LazyVim.on_very_lazy(function()
-  print("VeryLazy event fired")
-end)
