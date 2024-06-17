@@ -11,9 +11,9 @@ del({ "n", "t" }, "<C-h>")
 del({ "n", "t" }, "<C-j>")
 del({ "n", "t" }, "<C-k>")
 del({ "n", "t" }, "<C-l>")
-del("x", "i")
-del("x", "in")
-del("x", "il")
+-- del("x", "i")
+-- del("x", "in")
+-- del("x", "il")
 del("n", "yÞ")
 del("n", "yiÞ")
 del("n", "yaÞ")
@@ -30,6 +30,11 @@ vim.cmd([[
   vnoremap n j
   vnoremap i k
   vnoremap o l
+
+  onoremap y h
+  onoremap n j
+  onoremap i k
+  onoremap o l
 
   " a workaround for the fact that `i` are used up in visual mode
   " vnoremap " i"
