@@ -7,10 +7,10 @@ vim.g.rightkey = "o"
 
 local del = vim.keymap.del
 
-del({ "n", "t" }, "<C-h>")
-del({ "n", "t" }, "<C-j>")
-del({ "n", "t" }, "<C-k>")
-del({ "n", "t" }, "<C-l>")
+-- del({ "n", "t" }, "<C-h>")
+-- del({ "n", "t" }, "<C-j>")
+-- del({ "n", "t" }, "<C-k>")
+-- del({ "n", "t" }, "<C-l>")
 -- del("x", "i")
 -- del("x", "in")
 -- del("x", "il")
