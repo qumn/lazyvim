@@ -28,4 +28,8 @@ return {
       { "=P", "<Plug>(YankyPutBeforeFilter)", desc = "Put Before Applying a Filter" },
     },
   },
+  {
+    "junegunn/vim-easy-align",
+    event = "BufRead",
+  },
 }
