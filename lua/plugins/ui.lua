@@ -6,7 +6,7 @@ return {
   },
   {
     -- "sainnhe/everforest",
-    dir = "~/project/lua/everforest",
+    dir = "~/Workspace/lua/everforest",
     branch = "cstm",
     -- version = false,
     -- lazy = false,
