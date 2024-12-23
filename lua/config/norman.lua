@@ -21,20 +21,21 @@ local del = vim.keymap.del
 
 vim.cmd([[
   " === norman keyboard layout
-  nnoremap y h
+  nnoremap <nowait> y h
   " nnoremap n j
   " nnoremap i k
-  nnoremap o l
+  nnoremap <nowait> o l
 
-  vnoremap y h
-  vnoremap n j
-  vnoremap i k
-  vnoremap o l
+  vnoremap <nowait> y h
+  vnoremap <nowait> n j
+  vnoremap <nowait> i k
+  vnoremap <nowait> o l
 
-  onoremap y h
-  onoremap n j
-  onoremap i k
-  onoremap o l
+  onoremap <nowait> y h
+  onoremap <nowait> n j
+  onoremap <nowait> i k
+  onoremap <nowait> o l
+  xnoremap <nowait> i k
 
   " a workaround for the fact that `i` are used up in visual mode
   " vnoremap " i"
