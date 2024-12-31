@@ -7,6 +7,7 @@ vim.g.gui_font_default_size = 18
 vim.g.gui_font_size = vim.g.gui_font_default_size
 vim.g.gui_font_face = "CaskaydiaCove Nerd Font"
 vim.g.jumpoptions = "stack"
+vim.g.snacks_animate = false
 
 -- Keymaps
 vim.keymap.set("n", "<C-=>", function()
