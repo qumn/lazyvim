@@ -29,3 +29,5 @@ end
 
 -- if you only want these mappings for toggle term use term://*toggleterm#* instead
 vim.cmd("autocmd! TermOpen term://* lua set_terminal_keymaps()")
+vim.keymap.set("v", "=", vim.lsp.buf.format, { silent = true })
+vim.keymap.set("n", "==", vim.lsp.buf.format, { silent = true })
