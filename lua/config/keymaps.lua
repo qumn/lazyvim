@@ -4,6 +4,11 @@
 
 require("config.norman")
 
+-- if you only want these mappings for toggle term use term://*toggleterm#* instead
+vim.keymap.set("v", "=", vim.lsp.buf.format, { silent = true })
+vim.keymap.set("n", "==", vim.lsp.buf.format, { silent = true })
+
+-- config for neovide
 if vim.g.neovide then
   vim.cmd([[
     nmap <D-c> "+y
@@ -16,18 +21,28 @@ if vim.g.neovide then
   ]])
 end
 
-function _G.set_terminal_keymaps()
-  local opts = { buffer = 0 }
-  vim.keymap.set("t", "<esc>", [[<C-\><C-n>]], opts)
-  -- vim.keymap.set('t', 'ni', [[<C-\><C-n>]], opts)
-  vim.keymap.set("t", "<C-y>", [[<Cmd>wincmd h<CR>]], opts)
-  vim.keymap.set("t", "<C-n>", [[<Cmd>wincmd j<CR>]], opts)
-  -- vim.keymap.set('t', '<C-i>', [[<Cmd>wincmd k<CR>]], opts)
-  vim.keymap.set("t", "<C-o>", [[<Cmd>wincmd l<CR>]], opts)
-  -- vim.keymap.set('t', '<C-w>', [[<C-\><C-n><C-w>]], opts)
+-- Keymaps
+vim.keymap.set("n", "<C-=>", function()
+  ResizeGuiFont(1)
+end)
+vim.keymap.set("n", "<C-->", function()
+  ResizeGuiFont(-1)
+end)
+
+-- gui specialize config
+RefreshGuiFont = function()
+  vim.opt.guifont = string.format("%s:h%s", vim.g.gui_font_face, vim.g.gui_font_size)
 end
 
--- if you only want these mappings for toggle term use term://*toggleterm#* instead
-vim.cmd("autocmd! TermOpen term://* lua set_terminal_keymaps()")
-vim.keymap.set("v", "=", vim.lsp.buf.format, { silent = true })
-vim.keymap.set("n", "==", vim.lsp.buf.format, { silent = true })
+ResizeGuiFont = function(delta)
+  vim.g.gui_font_size = vim.g.gui_font_size + delta
+  RefreshGuiFont()
+end
+
+ResetGuiFont = function()
+  vim.g.gui_font_size = vim.g.gui_font_default_size
+  RefreshGuiFont()
+end
+
+-- Call function on startup to set default value
+ResetGuiFont()
