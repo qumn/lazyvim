@@ -36,6 +36,7 @@ return {
   "nvim-lualine/lualine.nvim",
   optional = true,
   opts = function(_, opts)
+    -- TODO: get moudle name by lsp for more language.
     local crate_name = {
       function()
         return "󱉭 " .. get_crate_name()

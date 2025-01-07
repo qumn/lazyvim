@@ -77,6 +77,10 @@ vim.cmd([[
   " nnoremap <C-n> <C-w>j
   " nnoremap <C-i> <C-w>k
   " nnoremap <C-o> <C-w>l
+  nnoremap <M-o> <Cmd>BufferLineCycleNext<CR>
+  nnoremap <M-y> <Cmd>BufferLineCyclePrev<CR>
+  nnoremap go <Cmd>BufferLineCycleNext<CR>
+  nnoremap gy <Cmd>BufferLineCyclePrev<CR>
 
   xnoremap p pgvy
 
