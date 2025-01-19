@@ -31,5 +31,8 @@ return {
   {
     "junegunn/vim-easy-align",
     event = "BufRead",
+    keys = {
+      { "ga", "<Plug>(EasyAlign)", mode = { "n", "x" }, desc = "EasyAlign" },
+    },
   },
 }
