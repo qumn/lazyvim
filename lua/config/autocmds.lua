@@ -6,18 +6,18 @@
 -- Use the more sane snippet session leave logic. Copied from:
 -- https://github.com/L3MON4D3/LuaSnip/issues/258#issuecomment-1429989436
 -- https://github.com/LazyVim/LazyVim/pull/2519/commits/5a708b199e9d487dd407ec3207e71b863371ad0d
-vim.api.nvim_create_autocmd("ModeChanged", {
-  pattern = "*",
-  callback = function()
-    if
-      ((vim.v.event.old_mode == "s" and vim.v.event.new_mode == "n") or vim.v.event.old_mode == "i")
-      and require("luasnip").session.current_nodes[vim.api.nvim_get_current_buf()]
-      and not require("luasnip").session.jump_active
-    then
-      require("luasnip").unlink_current()
-    end
-  end,
-})
+-- vim.api.nvim_create_autocmd("ModeChanged", {
+--   pattern = "*",
+--   callback = function()
+--     if
+--       ((vim.v.event.old_mode == "s" and vim.v.event.new_mode == "n") or vim.v.event.old_mode == "i")
+--       and require("luasnip").session.current_nodes[vim.api.nvim_get_current_buf()]
+--       and not require("luasnip").session.jump_active
+--     then
+--       require("luasnip").unlink_current()
+--     end
+--   end,
+-- })
 
 -- vim.api.nvim_create_autocmd("InsertEnter", {
 --   pattern = "*",
