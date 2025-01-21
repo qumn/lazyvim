@@ -7,6 +7,7 @@ return {
       ["<C-e>"] = { "hide", "fallback" },
 
       ["<Tab>"] = {
+        "snippet_forward",
         function(cmp)
           if cmp.snippet_active() then
             return cmp.accept()
@@ -14,10 +15,9 @@ return {
             return cmp.select_and_accept()
           end
         end,
-        "snippet_forward",
         "fallback",
       },
-      ["<CR>"] = { "snippet_forward", "accept", "fallback" },
+      ["<CR>"] = { "accept", "fallback" },
       ["<S-Tab>"] = { "snippet_backward", "fallback" },
 
       ["<Up>"] = { "select_prev", "fallback" },
@@ -27,11 +27,6 @@ return {
 
       ["<C-u>"] = { "scroll_documentation_up", "fallback" },
       ["<C-d>"] = { "scroll_documentation_down", "fallback" },
-    },
-    completion = {
-      trigger = {
-        show_in_snippet = false,
-      },
     },
   },
 }

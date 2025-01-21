@@ -5,9 +5,9 @@ M.highlight = {
   CursorLineNr = { fg = "#e69875", ctermfg = 208, bold = true },
 
   CmpItemAbbrDeprecated = { fg = "#7E8294", strikethrough = true },
-  CmpItemAbbrMatch = { fg = "#82AAFF", bold = true },
+  BlinkCmpMenuSelection = { fg = "#82AAFF", bold = true },
   CmpItemAbbrMatchFuzzy = { fg = "#82AAFF", bold = true },
-  CmpItemMenu = { fg = "#C792EA", italic = true },
+  BlinkCmpMenu = { fg = "#C792EA", italic = true },
 
   CmpItemKindField = { fg = "#EED8DA", bg = "#B5585F" },
   CmpItemKindProperty = { fg = "#EED8DA", bg = "#B5585F" },
