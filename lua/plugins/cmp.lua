@@ -1,5 +1,8 @@
 return {
   "saghen/blink.cmp",
+  dependencies = {
+    "onsails/lspkind.nvim",
+  },
   opts = {
     keymap = {
       preset = "none",
@@ -27,6 +30,43 @@ return {
 
       ["<C-u>"] = { "scroll_documentation_up", "fallback" },
       ["<C-d>"] = { "scroll_documentation_down", "fallback" },
+    },
+    completion = {
+      list = {
+        selection = {
+          preselect = false,
+        },
+      },
+      accept = {
+        auto_brackets = {
+          enabled = false,
+        },
+      },
+      menu = {
+        border = "rounded",
+        draw = {
+          -- padding = 1,
+          -- gap = 4,
+          columns = { { "kind_icon", "label", "label_description", gap = 1 } },
+          components = {
+            kind = {
+              text = function(ctx)
+                local len = 10 - string.len(ctx.kind)
+                local space = string.rep(" ", len)
+                return ctx.kind .. space .. "[" .. ctx.source_name .. "]"
+              end,
+            },
+            kind_icon = {
+              ellipsis = false,
+              text = function(ctx)
+                return require("lspkind").symbolic(ctx.kind, {
+                  mode = "symbol",
+                }) .. " "
+              end,
+            },
+          },
+        },
+      },
     },
   },
 }
