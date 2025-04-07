@@ -1,6 +1,5 @@
 {
   "extras": [
-    "lazyvim.plugins.extras.ai.copilot",
     "lazyvim.plugins.extras.editor.telescope",
     "lazyvim.plugins.extras.lang.go",
     "lazyvim.plugins.extras.lang.java",
@@ -15,8 +14,9 @@
     "lazyvim.plugins.extras.lang.yaml",
     "lazyvim.plugins.extras.util.project"
   ],
+  "install_version": 7,
   "news": {
     "NEWS.md": "10960"
   },
-  "version": 7
+  "version": 8
 }
