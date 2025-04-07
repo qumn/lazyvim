@@ -13,3 +13,14 @@
   (#set! injection.language "sql")
   (#set! injection.include-children))
 
+(call_expression
+  function: [
+    (scoped_identifier
+      name: (_) @_function_name)
+    (identifier) @_function_name
+  ]
+  arguments: (arguments
+      (raw_string_literal
+        (string_content) @injection.content))
+  (#match? @_function_name "query(_as|_scalar|)")
+  (#set! injection.language "sql"))
