@@ -72,6 +72,7 @@ vim.cmd([[
   nnoremap <C-w>n <C-w>j
   nnoremap <C-w>i <C-w>k
   nnoremap <C-w>o <C-w>l
+  nnoremap <C-w>l <Cmd>wincmd o<CR>
 
   " nnoremap <C-y> <C-w>h
   " nnoremap <C-n> <C-w>j

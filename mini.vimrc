@@ -1,4 +1,5 @@
 set leader=" "
+nmap <leader>mv :vsplit<CR><C-w>h:bprev<CR>
 " === norman keyboard layout
 nnoremap y h
 nnoremap n j
@@ -62,3 +63,4 @@ nnoremap <silent> <leader>q :q!<CR>
 nnoremap js <plugys>
 nnoremap ds <plugds>
 nnoremap cs <plugcs>
+
