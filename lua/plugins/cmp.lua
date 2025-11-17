@@ -10,7 +10,6 @@ return {
       ["<C-e>"] = { "hide", "fallback" },
 
       ["<Tab>"] = {
-        "snippet_forward",
         function(cmp)
           if cmp.snippet_active() then
             return cmp.accept()
@@ -18,6 +17,7 @@ return {
             return cmp.select_and_accept()
           end
         end,
+        "snippet_forward",
         "fallback",
       },
       ["<CR>"] = { "accept", "fallback" },
@@ -34,7 +34,9 @@ return {
     completion = {
       list = {
         selection = {
-          preselect = false,
+          preselect = function(_)
+            return not require("blink.cmp").snippet_active({ direction = 1 })
+          end,
         },
       },
       accept = {
