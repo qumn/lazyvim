@@ -1,25 +1,13 @@
 return {
-  "aserowy/tmux.nvim",
+  "mrjones2014/smart-splits.nvim",
   event = "BufRead",
   enable = not vim.g.neovide,
-  opts = {
-    copy_sync = {
-      enable = false, -- 启动这个选项会使':'变得非常慢
-    },
-    navigation = {
-      enable_default_keybindings = false,
-    },
-    resize = {
-      enable_default_keybindings = true,
-    },
-  },
   init = function()
     local map = vim.keymap.set
-      -- stylua: ignore start
-      map("n", "<c-y>", function() require("tmux").move_left() end)
-      map("n", "<c-n>", function() require("tmux").move_bottom() end)
-      map("n", "<C-i>", function() require("tmux").move_top() end)
-      map("n", "<c-o>", function() require("tmux").move_right() end)
-    -- stylua: ignore end
+    map("n", "<C-y>", require("smart-splits").move_cursor_left)
+    map("n", "<C-n>", require("smart-splits").move_cursor_down)
+    map("n", "<C-i>", require("smart-splits").move_cursor_up)
+    map("n", "<C-o>", require("smart-splits").move_cursor_right)
+    map("n", "<C-\\>", require("smart-splits").move_cursor_previous)
   end,
 }
