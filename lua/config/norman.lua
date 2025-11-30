@@ -5,20 +5,6 @@ vim.g.downkey = "n"
 vim.g.leftkey = "y"
 vim.g.rightkey = "o"
 
-local del = vim.keymap.del
-
--- del({ "n", "t" }, "<C-h>")
--- del({ "n", "t" }, "<C-j>")
--- del({ "n", "t" }, "<C-k>")
--- del({ "n", "t" }, "<C-l>")
--- del("x", "i")
--- del("x", "in")
--- del("x", "il")
--- del("n", "yÞ")
--- del("n", "yiÞ")
--- del("n", "yaÞ")
--- del("n", "y")
-
 vim.cmd([[
   " === norman keyboard layout
   nnoremap <nowait> y h
@@ -63,9 +49,10 @@ vim.cmd([[
   noremap H N
   noremap k r
   noremap K R
-  nnoremap <c-l> <c-o>
-  nnoremap <c-r> <c-i>
-  nnoremap <c-u> <c-r>
+  nnoremap <C-l> <C-o>
+  nnoremap <C-r> <c-i>
+  " nnoremap <c-u> <c-r>
+  nnoremap U <C-r>
 
   " jump between windows
   nnoremap <C-w>y <C-w>h
