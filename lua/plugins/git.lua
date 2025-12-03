@@ -72,7 +72,7 @@ return {
     },
     keys = {
       { "<Leader>gd", mode = "n", "<CMD>CodeDiff<CR>", desc = "Open CodeDiff" },
-      { "<Leader>gf", mode = "n", "<CMD>CodeDiff file HEAD~1<CR>", desc = "CodeDiff Current Buffer" },
+      { "<Leader>gf", mode = "n", "<CMD>CodeDiff file HEAD<CR>", desc = "CodeDiff Current Buffer" },
     },
   },
 }
