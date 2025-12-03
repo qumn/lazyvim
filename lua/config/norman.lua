@@ -19,7 +19,7 @@ vim.cmd([[
 
   onoremap <nowait> y h
   onoremap <nowait> n j
-  onoremap <nowait> i k
+  " onoremap <nowait> i k
   onoremap <nowait> o l
   xnoremap <nowait> i k
 
@@ -39,10 +39,10 @@ vim.cmd([[
   " noremap I K
 
   " map r <Nop>
-  noremap r i
-  noremap R I
-  noremap l o
-  noremap L O
+  nnoremap r i
+  nnoremap R I
+  nnoremap l o
+  nnoremap L O
 
   noremap j y
   noremap h n
