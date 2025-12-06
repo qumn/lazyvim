@@ -9,10 +9,15 @@ return {
         function() require("telescope.builtin").find_files({ cwd = require("lazy.core.config").options.root }) end,
         desc = "Find Plugin File",
       },
+      {
+        "se",
+        "<CMD>Telescope oldfiles<CR>",
+        desc = "Recent",
+      },
     },
     opts = function(_, opts)
       local actions = require("telescope.actions")
-      local prev = "<C-" .. vim.g.upkey .. ">"
+      local prev = "<C-i>"
       return vim.tbl_extend("force", opts, {
         defaults = {
           theme = "ivy",

@@ -40,9 +40,9 @@ vim.cmd([[
 
   " map r <Nop>
   nnoremap r i
-  nnoremap R I
-  nnoremap l o
-  nnoremap L O
+  noremap R I
+  noremap l o
+  noremap L O
 
   noremap j y
   noremap h n
