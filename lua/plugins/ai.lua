@@ -119,4 +119,24 @@ return {
       desc = "Sidekick Toggle Claude",
     },
   },
+  config = function(_, opts)
+    require("sidekick").setup(opts)
+
+    -- HACK: PERF disable opencode backend.
+    -- Reason: opencode backend calls `lsof` to list *all* listening TCP processes, then
+    -- runs `nvim_get_proc(pid)` for each PID to find "opencode". On some systems this
+    -- is ~0.5–1s per refresh and blocks UI. I don't need opencode, so drop the backend.
+    local ok, session = pcall(require, "sidekick.cli.session")
+    if ok and session and type(session.register) == "function" then
+      local orig_register = session.register
+      ---@diagnostic disable-next-line: duplicate-set-field
+      session.register = function(name, backend)
+        if name == "opencode" then
+          -- skip opencode registration entirely
+          return
+        end
+        return orig_register(name, backend)
+      end
+    end
+  end,
 }
