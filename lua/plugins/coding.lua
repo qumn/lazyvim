@@ -17,6 +17,7 @@ return {
   {
     "folke/flash.nvim",
     event = "VeryLazy",
+    enabled = false,
     config = function(_, _)
       -- discard default config
     end,

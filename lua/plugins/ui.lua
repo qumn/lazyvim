@@ -22,9 +22,4 @@ return {
       require("window-picker").setup()
     end,
   },
-  -- {
-  --   "folke/tokyonight.nvim",
-  --   lazy = true,
-  --   opts = { style = "storm" },
-  -- },
 }

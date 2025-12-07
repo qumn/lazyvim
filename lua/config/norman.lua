@@ -1,10 +1,5 @@
 -- the norman layout display
 
-vim.g.upkey = "i"
-vim.g.downkey = "n"
-vim.g.leftkey = "y"
-vim.g.rightkey = "o"
-
 vim.cmd([[
   " === norman keyboard layout
   nnoremap <nowait> y h
@@ -64,6 +59,7 @@ vim.cmd([[
   " nnoremap <C-y> <C-w>h
   " nnoremap <C-n> <C-w>j
   " nnoremap <C-i> <C-w>k
+  
   " nnoremap <C-o> <C-w>l
   nnoremap <M-o> <Cmd>BufferLineCycleNext<CR>
   nnoremap <M-y> <Cmd>BufferLineCyclePrev<CR>
