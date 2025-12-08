@@ -7,8 +7,34 @@ require("config.norman")
 vim.keymap.set("v", "=", vim.lsp.buf.format, { silent = true })
 vim.keymap.set("n", "==", vim.lsp.buf.format, { silent = true })
 
--- config for neovide
-if vim.g.neovide then
+-- delete all marks for current line
+vim.keymap.set({ "n" }, "md", function()
+  -- delete buffer local marks
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cur_line = vim.fn.line(".")
+  ---@type { mark: string, pos: number[] }[]
+  local all_marks_local = vim.fn.getmarklist(bufnr)
+  for _, mark in ipairs(all_marks_local) do
+    if mark.pos[2] == cur_line and string.match(mark.mark, "'[a-z]") then
+      vim.api.nvim_buf_del_mark(bufnr, string.sub(mark.mark, 2, 2))
+    end
+  end
+
+  -- delete global marks
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
+  ---@type { file: string, mark: string, pos: number[] }[]
+  local all_marks_global = vim.fn.getmarklist()
+  for _, mark in ipairs(all_marks_global) do
+    local expanded_file_name = vim.fn.fnamemodify(mark.file, ":p")
+    if bufname == expanded_file_name and mark.pos[2] == cur_line and string.match(mark.mark, "'[A-Z]") then
+      vim.api.nvim_del_mark(string.sub(mark.mark, 2, 2))
+    end
+  end
+end, { desc = "Delete all marks for current line" })
+
+-- config for neovide, Macos using Cmd key for copy/paste
+-- otherwise using Ctrl+Shift
+if vim.g.neovide and vim.g.os_name ~= "Darwin" then
   vim.api.nvim_set_keymap("v", "<sc-c>", '"+y', { noremap = true })
   vim.api.nvim_set_keymap("n", "<sc-v>", 'l"+P', { noremap = true })
   vim.api.nvim_set_keymap("v", "<sc-v>", '"+P', { noremap = true })
@@ -16,6 +42,13 @@ if vim.g.neovide then
   vim.api.nvim_set_keymap("c", "<sc-v>", "<C-r>+", { noremap = true })
   vim.api.nvim_set_keymap("i", "<sc-v>", '<ESC>l"+Pli', { noremap = true })
   vim.api.nvim_set_keymap("t", "<sc-v>", '<C-\\><C-n>"+Pi', { noremap = true })
+elseif vim.g.neovide and vim.g.os_name == "Darwin" then
+  vim.api.nvim_set_keymap("v", "<D-c>", '"+y', { noremap = true })
+  vim.api.nvim_set_keymap("n", "<D-v>", 'l"+P', { noremap = true })
+  vim.api.nvim_set_keymap("v", "<D-v>", '"+P', { noremap = true })
+  vim.api.nvim_set_keymap("c", "<D-v>", "<C-r>+", { noremap = true })
+  vim.api.nvim_set_keymap("i", "<D-v>", '<ESC>l"+Pli', { noremap = true })
+  vim.api.nvim_set_keymap("t", "<D-v>", '<C-\\><C-n>"+Pi', { noremap = true })
 end
 
 -- Keymaps

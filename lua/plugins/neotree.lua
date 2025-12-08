@@ -27,15 +27,15 @@ return {
       system_explorer = function(state)
         local node = state.tree:get_node()
         local path = node:get_id()
-        local uname = vim.loop.os_uname()
+        local os_name = vim.g.os_name
 
-        if uname.sysname == "Darwin" then
+        if os_name == "Darwin" then
           -- macOs: open file in default application in the background.
           vim.fn.jobstart({ "open", "-R", path }, { detach = true })
-        elseif uname.sysname == "Linux" then
+        elseif os_name == "Linux" then
           -- Linux: open file in default application
           vim.fn.jobstart({ "xdg-open", path }, { detach = true })
-        elseif uname.sysname == "Windows" then
+        elseif os_name == "Windows" then
           -- Windows: Without removing the file from the path, it opens in code.exe instead of explorer.exe
           local p
           local lastSlashIndex = path:match("^.+()\\[^\\]*$") -- Match the last slash and everything before it
