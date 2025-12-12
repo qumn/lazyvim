@@ -4,6 +4,7 @@ local Job = require("plenary.job")
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
 local conf = require("telescope.config").values
+local entry_display = require("telescope.pickers.entry_display")
 local previewers = require("telescope.previewers")
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
@@ -74,6 +75,26 @@ function M.endpoints_picker(opts)
       class_level_pred = opts.class_level_pred,
     })
 
+    local default_hl_http = {
+      GET = "DiagnosticOk",
+      POST = "DiagnosticWarn",
+      PUT = "DiagnosticHint",
+      DELETE = "DiagnosticError",
+      PATCH = "TelescopeResultsOperator",
+      ANY = "TelescopeResultsConstant",
+    }
+
+    local hl_http = vim.tbl_extend("force", default_hl_http, opts.hl_http or {})
+
+    local displayer = entry_display.create({
+      separator = " ",
+      items = {
+        { width = 6 },
+        { width = 45 },
+        { remaining = true },
+      },
+    })
+
     pickers
       .new(opts, {
         prompt_title = "Spring Endpoints",
@@ -86,10 +107,16 @@ function M.endpoints_picker(opts)
             end
 
             local controller = abs_file:match("([^/]+Controller%.java)$") or abs_file:match("([^/]+)$")
-            local display = string.format("%-6s %-45s %-30s", e.http, e.path, controller)
+            local method_hl = hl_http[e.http] or hl_http.ANY or hl_http[""] or nil
             return {
               value = e,
-              display = display,
+              display = function()
+                return displayer({
+                  { e.http, method_hl },
+                  e.path,
+                  controller,
+                })
+              end,
               ordinal = table.concat({
                 e.http or "",
                 e.path or "",
