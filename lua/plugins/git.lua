@@ -58,10 +58,10 @@ return {
         view = {
           quit = "q",
           toggle_explorer = "<leader>e",
-          next_hunk = "]c", -- Jump to next change
-          prev_hunk = "[c", -- Jump to previous change
-          next_file = "]f", -- Next file in explorer mode
-          prev_file = "[f", -- Previous file in explorer mode
+          next_hunk = "N", -- Jump to next change
+          prev_hunk = "I", -- Jump to previous change
+          next_file = "<Down>", -- Next file in explorer mode
+          prev_file = "<Up>", -- Previous file in explorer mode
         },
         explorer = {
           select = "o", -- Open diff for selected file

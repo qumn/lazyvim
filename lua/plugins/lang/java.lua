@@ -11,4 +11,17 @@ return {
       -- end,
     },
   },
+  {
+    dir = vim.fn.stdpath("config") .. "/spring.nvim",
+    name = "spring.nvim",
+    cmd = "SpringEndpoints",
+    dependencies = { "nvim-telescope/telescope.nvim" },
+    keys = {
+      { "<Leader>sr", mode = "n", "<cmd>SpringEndpoints<cr>", desc = "List Spring Endpoints" },
+    },
+    config = function()
+      require("spring").setup()
+      require("telescope").load_extension("spring")
+    end,
+  },
 }

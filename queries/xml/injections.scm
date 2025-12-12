@@ -16,19 +16,3 @@
   (#set! injection.include-children)
 )
 
-; Inject SQL inside CDATA within those tags
-; (element
-;   (STag
-;     (Name) @_name
-;   )
-;   (content
-;     (cdata_section) @injection.content
-;   )
-;   (ETag
-;     (Name) @_end
-;   )
-;   (#any-of? @_name "select" "insert" "update" "delete" "sql")
-;   (#eq? @_name @_end)
-;   (#set! injection.language "sql")
-;   (#set! injection.include-children)
-; )
