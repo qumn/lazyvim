@@ -104,6 +104,19 @@ return {
     dependencies = { "neovim/nvim-lspconfig" },
     config = function()
       require("mybatis").setup({})
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "java", "xml" },
+        callback = function(args)
+          local mybatis = require("mybatis")
+          if not mybatis.is_mapper_file(args.buf) then
+            return
+          end
+
+          vim.keymap.set("n", "gd", function()
+            mybatis.jump_or_fallback()
+          end, { buffer = args.buf, desc = "MyBatis jump or definition" })
+        end,
+      })
     end,
   },
 
