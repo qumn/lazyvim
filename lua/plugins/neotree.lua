@@ -1,6 +1,7 @@
 return {
   "nvim-neo-tree/neo-tree.nvim",
   opts = {
+    close_if_last_window = true,
     filesystem = {
       group_empty_dirs = true,
       scan_mode = "deep",
@@ -12,6 +13,10 @@ return {
           "open",
           nowait = true,
         },
+        ["<C-s>"] = "open_split",
+        ["<C-v>"] = "open_vsplit",
+        ["<C-t>"] = "open_tabnew",
+        ["S"] = "noop",
         ["oc"] = "noop",
         ["od"] = "noop",
         ["og"] = "noop",

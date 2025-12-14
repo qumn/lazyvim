@@ -58,4 +58,17 @@ return {
       },
     },
   },
+  {
+    "folke/trouble.nvim",
+    opts = {
+      win = {
+        keys = {
+          i = false,
+        },
+      },
+      keys = {
+        i = false,
+      },
+    },
+  },
 }

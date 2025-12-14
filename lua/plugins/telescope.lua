@@ -14,6 +14,11 @@ return {
         "<CMD>Telescope oldfiles<CR>",
         desc = "Recent",
       },
+      {
+        "sb",
+        "<CMD>Telescope buffers<CR>",
+        desc = "Buffers",
+      },
     },
     opts = function(_, opts)
       local actions = require("telescope.actions")
