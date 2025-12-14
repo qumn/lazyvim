@@ -55,6 +55,7 @@ return {
 
           ["<C-u>"] = "keymap.scroll_output_up",
           ["<C-d>"] = "keymap.scroll_output_down",
+          ["<C-c>"] = { "keymap.run_action", opts = { action = "stop" }, desc = "Stop task" },
           ["<C-h>"] = false,
           ["<C-j>"] = false,
           ["<C-k>"] = false,
