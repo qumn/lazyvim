@@ -74,13 +74,29 @@ local function append_lines(task, bufnr, lines)
   end
 end
 
-local function format_main_class_item(opt)
-  local label = opt.mainClass or ""
-  if opt.projectName and opt.projectName ~= "" then
-    label = label .. " [" .. opt.projectName .. "]"
+local function format_main_class_item(opt, supports_chunks)
+  local full = opt.mainClass or ""
+  local short = full:match("([^.]+)$") or full
+  local project = opt.projectName or ""
+  local file_path = opt.filePath and opt.filePath ~= "" and vim.fn.fnamemodify(opt.filePath, ":~:.") or ""
+
+  if supports_chunks then
+    local chunks = { { short, "Type" } }
+    if project ~= "" then
+      table.insert(chunks, { " [" .. project .. "]", "SnacksPickerSpecial" })
+    end
+    if file_path ~= "" then
+      table.insert(chunks, { " - " .. file_path, "Comment" })
+    end
+    return chunks
   end
-  if opt.filePath and opt.filePath ~= "" then
-    label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+
+  local label = short
+  if project ~= "" then
+    label = label .. " [" .. project .. "]"
+  end
+  if file_path ~= "" then
+    label = label .. " - " .. file_path
   end
   return label
 end
