@@ -55,8 +55,10 @@ return {
     opts = function(_, opts)
       -- jdtls cmd flags
       local cmd = opts.cmd
-      table.insert(cmd, "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false")
-      table.insert(cmd, "-Dlog.perf.level=OFF")
+      -- table.insert(cmd, "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false")
+      -- table.insert(cmd, "-Dlog.perf.level=OFF")
+      -- local project_name = vim.fn.fnamemodify(vim.fn.getcwd(), ":p:h:t")
+      -- local data_dir = vim.fn.stdpath("cache") .. "jdtls/" .. project_name
 
       -- macOS: pin the java executable used to run jdtls (JDK 21)
       if is_macos() then
