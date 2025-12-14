@@ -51,6 +51,25 @@ elseif vim.g.neovide and vim.g.os_name == "Darwin" then
   vim.api.nvim_set_keymap("t", "<D-v>", '<C-\\><C-n>"+Pi', { noremap = true })
 end
 
+-- toggle case of word under cursor
+local function toggle_case()
+  local word = vim.fn.expand("<cword>")
+
+  -- snake_case -> camelCase
+  if word:find("_") then
+    local camel = word:gsub("_(%w)", function(c)
+      return c:upper()
+    end)
+    vim.cmd("normal! ciw" .. camel)
+  else
+    -- camelCase / PascalCase -> snake_case
+    local snake = word:gsub("(%u)", "_%1"):gsub("^_", ""):lower()
+    vim.cmd("normal! ciw" .. snake)
+  end
+end
+
+vim.keymap.set("n", "gcs", toggle_case, { desc = "Toggle case of word under cursor" })
+
 -- Keymaps
 vim.keymap.set("n", "<C-=>", function()
   ResizeGuiFont(1)
