@@ -34,8 +34,8 @@ local function guess_short_name(file_path)
 end
 
 return {
-  name = "jdtls run main (buildWorkspace)",
-  desc = "buildWorkspace -> resolveClasspath -> run",
+  name = "Java: Run Main",
+  desc = "Build then run main class",
   tags = { overseer.TAG.RUN },
   params = {
     full_build = {
@@ -104,7 +104,7 @@ return {
         "on_complete_notify",
         "on_exit_set_status",
         { "on_complete_dispose", timeout = 0.5, statuses = { "SUCCESS" } },
-        { "open_output", direction = "dock", on_start = "never", on_complete = "failure" },
+        { "open_output", direction = "dock", on_start = "always", on_complete = "failure" },
       },
     }
 

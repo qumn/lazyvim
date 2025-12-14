@@ -74,7 +74,18 @@ local function append_lines(task, bufnr, lines)
   end
 end
 
-local function pick_main_class(options, current_file)
+local function format_main_class_item(opt)
+  local label = opt.mainClass or ""
+  if opt.projectName and opt.projectName ~= "" then
+    label = label .. " [" .. opt.projectName .. "]"
+  end
+  if opt.filePath and opt.filePath ~= "" then
+    label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+  end
+  return label
+end
+
+local function pick_main_class(options, current_file, cb)
   local candidates = {}
   for _, opt in ipairs(options or {}) do
     if current_file and opt.filePath == current_file then
@@ -86,29 +97,82 @@ local function pick_main_class(options, current_file)
   end
 
   if #candidates == 0 then
-    return nil
+    cb(nil)
+    return
   end
 
   if #candidates == 1 then
-    return candidates[1]
+    cb(candidates[1])
+    return
   end
 
-  local items = { "Select main class:" }
-  for i, opt in ipairs(candidates) do
-    local label = opt.mainClass or ""
-    if opt.projectName and opt.projectName ~= "" then
-      label = label .. " [" .. opt.projectName .. "]"
+  local done = false
+  local function finish(item)
+    if done then
+      return
     end
-    if opt.filePath and opt.filePath ~= "" then
-      label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+    done = true
+    cb(item)
+  end
+
+  local ok_snacks = pcall(require, "snacks")
+  if ok_snacks then
+    local ok_select, select = pcall(require, "snacks.picker.select")
+    if ok_select and select and type(select.select) == "function" then
+      select.select(candidates, {
+        prompt = "Select main class",
+        format_item = format_main_class_item,
+      }, function(item)
+        finish(item)
+      end)
+      return
     end
-    table.insert(items, string.format("%d. %s", i, label))
   end
-  local idx = vim.fn.inputlist(items)
-  if idx < 1 or idx > #candidates then
-    return nil
+
+  local ok_telescope, pickers = pcall(require, "telescope.pickers")
+  if ok_telescope then
+    local finders = require("telescope.finders")
+    local conf = require("telescope.config").values
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+
+    pickers.new({}, {
+      prompt_title = "Select main class",
+      finder = finders.new_table({
+        results = candidates,
+        entry_maker = function(item)
+          local display = format_main_class_item(item)
+          return {
+            value = item,
+            display = display,
+            ordinal = display,
+          }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr, _)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          finish(selection and selection.value or nil)
+          actions.close(prompt_bufnr)
+        end)
+        actions.close:enhance({
+          post = function()
+            finish(nil)
+          end,
+        })
+        return true
+      end,
+    }):find()
+    return
   end
-  return candidates[idx]
+
+  vim.ui.select(candidates, {
+    prompt = "Select main class",
+    format_item = format_main_class_item,
+  }, function(item)
+    finish(item)
+  end)
 end
 
 local function cancel_request(client_id, request_id)
@@ -162,8 +226,43 @@ local function open_diagnostics_qf()
   end
 end
 
+local function propagate_main_to_run_after(task, pick)
+  if not pick or type(pick) ~= "table" then
+    return
+  end
+  if not pick.mainClass or pick.mainClass == "" then
+    return
+  end
+  if not task or type(task.components) ~= "table" then
+    return
+  end
+
+  local short = pick.mainClass:match("([^.]+)$") or pick.mainClass
+
+  for _, comp in ipairs(task.components) do
+    if comp.name == "run_after" and comp.params then
+      local tasks = comp.params.tasks or comp.params.task_names
+      if type(tasks) == "table" then
+        for _, defn in ipairs(tasks) do
+          if type(defn) == "table" and defn[1] == nil then
+            local strategy = defn.strategy
+            if type(strategy) == "table" and strategy[1] == "user.jdtls_run_main" then
+              strategy.main = vim.deepcopy(pick)
+              if short and short ~= "" then
+                defn.name = short
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 function JdtlsBuildWorkspace:_run_build(task, client, hint_bufnr)
   local params = self.params or {}
+
+  propagate_main_to_run_after(task, params)
 
   set_lines(task, self.bufnr, {
     "vscode.java.buildWorkspace",
@@ -266,19 +365,24 @@ function JdtlsBuildWorkspace:_ensure_main_class(task, client, hint_bufnr)
           return
         end
 
-        local pick = pick_main_class(result, file_path)
-        if not pick or not pick.mainClass then
-          append_lines(task, self.bufnr, { "canceled" })
-          task:on_exit(1)
-          return
-        end
+        pick_main_class(result, file_path, function(pick)
+          if task:is_complete() or self._stopped then
+            return
+          end
 
-        params.mainClass = pick.mainClass
-        params.projectName = pick.projectName
-        params.filePath = pick.filePath or params.filePath
-        self.params = params
+          if not pick or not pick.mainClass then
+            append_lines(task, self.bufnr, { "canceled" })
+            task:stop()
+            return
+          end
 
-        self:_run_build(task, client, hint_bufnr)
+          params.mainClass = pick.mainClass
+          params.projectName = pick.projectName
+          params.filePath = pick.filePath or params.filePath
+          self.params = params
+
+          self:_run_build(task, client, hint_bufnr)
+        end)
       end)
     end,
     hint_bufnr

@@ -97,8 +97,8 @@ local function guess_cwd(file_path)
 end
 
 return {
-  name = "jdtls buildWorkspace",
-  desc = "Invoke vscode.java.buildWorkspace via jdtls",
+  name = "Java: Build",
+  desc = "Build current project",
   tags = { overseer.TAG.BUILD },
   params = {
     full_build = {

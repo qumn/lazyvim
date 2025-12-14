@@ -103,7 +103,18 @@ local function as_list(v)
   return {}
 end
 
-local function pick_main_class(options, current_file)
+local function format_main_class_item(opt)
+  local label = opt.mainClass or ""
+  if opt.projectName and opt.projectName ~= "" then
+    label = label .. " [" .. opt.projectName .. "]"
+  end
+  if opt.filePath and opt.filePath ~= "" then
+    label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+  end
+  return label
+end
+
+local function pick_main_class(options, current_file, cb)
   local candidates = {}
   for _, opt in ipairs(options or {}) do
     if current_file and opt.filePath == current_file then
@@ -115,29 +126,82 @@ local function pick_main_class(options, current_file)
   end
 
   if #candidates == 0 then
-    return nil
+    cb(nil)
+    return
   end
 
   if #candidates == 1 then
-    return candidates[1]
+    cb(candidates[1])
+    return
   end
 
-  local items = { "Select main class:" }
-  for i, opt in ipairs(candidates) do
-    local label = opt.mainClass or ""
-    if opt.projectName and opt.projectName ~= "" then
-      label = label .. " [" .. opt.projectName .. "]"
+  local done = false
+  local function finish(item)
+    if done then
+      return
     end
-    if opt.filePath and opt.filePath ~= "" then
-      label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+    done = true
+    cb(item)
+  end
+
+  local ok_snacks = pcall(require, "snacks")
+  if ok_snacks then
+    local ok_select, select = pcall(require, "snacks.picker.select")
+    if ok_select and select and type(select.select) == "function" then
+      select.select(candidates, {
+        prompt = "Select main class",
+        format_item = format_main_class_item,
+      }, function(item)
+        finish(item)
+      end)
+      return
     end
-    table.insert(items, string.format("%d. %s", i, label))
   end
-  local idx = vim.fn.inputlist(items)
-  if idx < 1 or idx > #candidates then
-    return nil
+
+  local ok_telescope, pickers = pcall(require, "telescope.pickers")
+  if ok_telescope then
+    local finders = require("telescope.finders")
+    local conf = require("telescope.config").values
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+
+    pickers.new({}, {
+      prompt_title = "Select main class",
+      finder = finders.new_table({
+        results = candidates,
+        entry_maker = function(item)
+          local display = format_main_class_item(item)
+          return {
+            value = item,
+            display = display,
+            ordinal = display,
+          }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr, _)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          finish(selection and selection.value or nil)
+          actions.close(prompt_bufnr)
+        end)
+        actions.close:enhance({
+          post = function()
+            finish(nil)
+          end,
+        })
+        return true
+      end,
+    }):find()
+    return
   end
-  return candidates[idx]
+
+  vim.ui.select(candidates, {
+    prompt = "Select main class",
+    format_item = format_main_class_item,
+  }, function(item)
+    finish(item)
+  end)
 end
 
 
@@ -148,6 +212,7 @@ function JdtlsRunMain.new(opts)
     client_id = opts.client_id,
     bufnr_hint = opts.bufnr,
     cwd = opts.cwd,
+    main = opts.main,
     args = opts.args or {},
     vm_args = opts.vm_args or {},
     enable_preview = opts.enable_preview or false,
@@ -249,6 +314,142 @@ function JdtlsRunMain:start(task)
 
     self.client_id = client.id
 
+    local function continue_with_pick(pick)
+      if task:is_complete() or self._stopped then
+        return
+      end
+
+      if not pick or not pick.mainClass then
+        append_lines(task, self.bufnr, { "canceled" })
+        task:stop()
+        return
+      end
+
+      local short = pick.mainClass:match("([^.]+)$") or pick.mainClass
+      if short and short ~= "" then
+        task.name = short
+        pcall(function()
+          require("overseer.task_list").touch(task)
+        end)
+      end
+
+      local cwd = self.cwd or guess_cwd(pick.filePath)
+      task.cwd = cwd
+
+      append_lines(task, self.bufnr, { "vscode.java.resolveClasspath" })
+      local ok_cp, cp_id = client:request(
+        "workspace/executeCommand",
+        { command = "vscode.java.resolveClasspath", arguments = { pick.mainClass, pick.projectName } },
+        function(cp_err, cp)
+          vim.schedule(function()
+            self.request_id = nil
+
+            if task:is_complete() or self._stopped then
+              return
+            end
+
+            if cp_err or type(cp) ~= "table" then
+              append_lines(task, self.bufnr, { "resolveClasspath failed" })
+              task:on_exit(1)
+              return
+            end
+
+            append_lines(task, self.bufnr, { "vscode.java.resolveJavaExecutable" })
+            local ok_java, java_id = client:request(
+              "workspace/executeCommand",
+              {
+                command = "vscode.java.resolveJavaExecutable",
+                arguments = { pick.mainClass, pick.projectName },
+              },
+              function(java_err, java_exec)
+                vim.schedule(function()
+                  self.request_id = nil
+
+                  if task:is_complete() or self._stopped then
+                    return
+                  end
+
+                  if java_err or not java_exec or java_exec == "" then
+                    java_exec = vim.fn.exepath("java")
+                    if java_exec == "" then
+                      java_exec = "java"
+                    end
+                  end
+
+                  local module_paths = as_list(cp[1] or cp[0])
+                  local class_paths = as_list(cp[2] or cp[1])
+
+                  local cmd = { java_exec }
+                  for _, a in ipairs(self.vm_args or {}) do
+                    table.insert(cmd, a)
+                  end
+                  if self.enable_preview then
+                    table.insert(cmd, "--enable-preview")
+                  end
+
+                  local sep = path_sep()
+                  if #module_paths > 0 then
+                    table.insert(cmd, "--module-path")
+                    table.insert(cmd, table.concat(module_paths, sep))
+                  end
+                  if #class_paths > 0 then
+                    table.insert(cmd, "-cp")
+                    table.insert(cmd, table.concat(class_paths, sep))
+                  end
+
+                  table.insert(cmd, pick.mainClass)
+                  for _, a in ipairs(self.args or {}) do
+                    table.insert(cmd, a)
+                  end
+
+                  local cfg = require("overseer.config")
+                  local jobstart = require("overseer.strategy.jobstart")
+                  self.inner = jobstart.new({
+                    use_terminal = cfg.output.use_terminal,
+                    preserve_output = cfg.output.preserve_output,
+                  })
+
+                  local prev_bufnr = self.bufnr
+                  task.cmd = cmd
+                  self.inner:start(task)
+
+                  local next_bufnr = self.inner:get_bufnr()
+                  if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
+                    util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
+                    if vim.api.nvim_buf_is_valid(prev_bufnr) then
+                      util.soft_delete_buf(prev_bufnr)
+                    end
+                  end
+                  self.bufnr = nil
+                end)
+              end,
+              hint_bufnr
+            )
+
+            if ok_java then
+              self.request_id = java_id
+            else
+              append_lines(task, self.bufnr, { "failed to send resolveJavaExecutable" })
+              task:on_exit(1)
+            end
+          end)
+        end,
+        hint_bufnr
+      )
+
+      if ok_cp then
+        self.request_id = cp_id
+      else
+        append_lines(task, self.bufnr, { "failed to send resolveClasspath" })
+        task:on_exit(1)
+      end
+    end
+
+    if self.main and type(self.main) == "table" and self.main.mainClass and self.main.mainClass ~= "" then
+      continue_with_pick(self.main)
+      return
+    end
+
     append_lines(task, self.bufnr, { "vscode.java.resolveMainClass" })
 
     local ok, req_id = client:request(
@@ -256,6 +457,8 @@ function JdtlsRunMain:start(task)
       { command = "vscode.java.resolveMainClass", arguments = {} },
       function(err, result)
         vim.schedule(function()
+          self.request_id = nil
+
           if task:is_complete() or self._stopped then
             return
           end
@@ -266,127 +469,10 @@ function JdtlsRunMain:start(task)
             return
           end
 
-          local pick = pick_main_class(result, file_path ~= "" and file_path or nil)
-          if not pick or not pick.mainClass then
-            append_lines(task, self.bufnr, { "canceled" })
-            task:on_exit(1)
-            return
-          end
+          pick_main_class(result, file_path ~= "" and file_path or nil, function(pick)
+            continue_with_pick(pick)
+          end)
 
-          local short = pick.mainClass:match("([^.]+)$") or pick.mainClass
-          if short and short ~= "" then
-            task.name = short
-            pcall(function()
-              require("overseer.task_list").touch(task)
-            end)
-          end
-
-          local cwd = self.cwd or guess_cwd(pick.filePath)
-          task.cwd = cwd
-
-          append_lines(task, self.bufnr, { "vscode.java.resolveClasspath" })
-          local ok_cp, cp_id = client:request(
-            "workspace/executeCommand",
-            { command = "vscode.java.resolveClasspath", arguments = { pick.mainClass, pick.projectName } },
-            function(cp_err, cp)
-              vim.schedule(function()
-                if task:is_complete() or self._stopped then
-                  return
-                end
-
-                if cp_err or type(cp) ~= "table" then
-                  append_lines(task, self.bufnr, { "resolveClasspath failed" })
-                  task:on_exit(1)
-                  return
-                end
-
-                append_lines(task, self.bufnr, { "vscode.java.resolveJavaExecutable" })
-                local ok_java, java_id = client:request(
-                  "workspace/executeCommand",
-                  {
-                    command = "vscode.java.resolveJavaExecutable",
-                    arguments = { pick.mainClass, pick.projectName },
-                  },
-                  function(java_err, java_exec)
-                    vim.schedule(function()
-                      if task:is_complete() or self._stopped then
-                        return
-                      end
-
-                      if java_err or not java_exec or java_exec == "" then
-                        java_exec = vim.fn.exepath("java")
-                        if java_exec == "" then
-                          java_exec = "java"
-                        end
-                      end
-
-                      local module_paths = as_list(cp[1] or cp[0])
-                      local class_paths = as_list(cp[2] or cp[1])
-
-                      local cmd = { java_exec }
-                      for _, a in ipairs(self.vm_args or {}) do
-                        table.insert(cmd, a)
-                      end
-                      if self.enable_preview then
-                        table.insert(cmd, "--enable-preview")
-                      end
-
-                      local sep = path_sep()
-                      if #module_paths > 0 then
-                        table.insert(cmd, "--module-path")
-                        table.insert(cmd, table.concat(module_paths, sep))
-                      end
-                      if #class_paths > 0 then
-                        table.insert(cmd, "-cp")
-                        table.insert(cmd, table.concat(class_paths, sep))
-                      end
-
-                      table.insert(cmd, pick.mainClass)
-                      for _, a in ipairs(self.args or {}) do
-                        table.insert(cmd, a)
-                      end
-
-                      local cfg = require("overseer.config")
-                      local jobstart = require("overseer.strategy.jobstart")
-                      self.inner = jobstart.new({
-                        use_terminal = cfg.output.use_terminal,
-                        preserve_output = cfg.output.preserve_output,
-                      })
-
-                      local prev_bufnr = self.bufnr
-                      task.cmd = cmd
-                      self.inner:start(task)
-
-                      local next_bufnr = self.inner:get_bufnr()
-                      if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
-                        util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
-                        if vim.api.nvim_buf_is_valid(prev_bufnr) then
-                          util.soft_delete_buf(prev_bufnr)
-                        end
-                      end
-                      self.bufnr = nil
-                    end)
-                  end,
-                  hint_bufnr
-                )
-
-                if ok_java then
-                  self.request_id = java_id
-                else
-                  append_lines(task, self.bufnr, { "failed to send resolveJavaExecutable" })
-                  task:on_exit(1)
-                end
-              end)
-            end,
-            hint_bufnr
-          )
-
-          if ok_cp then
-            self.request_id = cp_id
-          else
-            append_lines(task, self.bufnr, { "failed to send resolveClasspath" })
-            task:on_exit(1)
-          end
         end)
       end,
       hint_bufnr
