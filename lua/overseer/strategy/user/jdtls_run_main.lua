@@ -1,0 +1,425 @@
+local util = require("overseer.util")
+
+local JdtlsRunMain = {}
+
+local function list_clients()
+  if vim.lsp.get_clients then
+    return vim.lsp.get_clients()
+  end
+  return vim.lsp.get_active_clients()
+end
+
+local function find_jdtls_client(bufnr, preferred_id)
+  if preferred_id then
+    local c = vim.lsp.get_client_by_id(preferred_id)
+    if c then
+      return c
+    end
+  end
+
+  if bufnr and bufnr > 0 then
+    for _, c in ipairs(list_clients()) do
+      if c.name == "jdtls" and c.attached_buffers and c.attached_buffers[bufnr] then
+        return c
+      end
+    end
+  end
+
+  for _, c in ipairs(list_clients()) do
+    if c.name == "jdtls" then
+      return c
+    end
+  end
+
+  return nil
+end
+
+local function set_lines(task, bufnr, lines)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  vim.bo[bufnr].modifiable = true
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
+  vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modified = false
+
+  if task and not task:is_complete() then
+    task:dispatch("on_output", lines)
+    task:dispatch("on_output_lines", lines)
+  end
+end
+
+local function append_lines(task, bufnr, lines)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  vim.bo[bufnr].modifiable = true
+  local count = vim.api.nvim_buf_line_count(bufnr)
+  vim.api.nvim_buf_set_lines(bufnr, count, count, true, lines)
+  vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modified = false
+
+  if task and not task:is_complete() then
+    task:dispatch("on_output", lines)
+    task:dispatch("on_output_lines", lines)
+  end
+end
+
+local function guess_cwd(file_path)
+  if not file_path or file_path == "" then
+    return vim.fn.getcwd()
+  end
+  local start = vim.fs.dirname(file_path)
+  local markers = {
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+    "mvnw",
+    "gradlew",
+    ".git",
+  }
+  local found = vim.fs.find(markers, { upward = true, path = start })[1]
+  if found then
+    return vim.fs.dirname(found)
+  end
+  return start
+end
+
+local function path_sep()
+  if vim.fn.has("win32") == 1 then
+    return ";"
+  end
+  return ":"
+end
+
+local function as_list(v)
+  if type(v) == "table" then
+    return v
+  end
+  return {}
+end
+
+local function pick_main_class(options, current_file)
+  local candidates = {}
+  for _, opt in ipairs(options or {}) do
+    if current_file and opt.filePath == current_file then
+      table.insert(candidates, opt)
+    end
+  end
+  if #candidates == 0 then
+    candidates = options or {}
+  end
+
+  if #candidates == 0 then
+    return nil
+  end
+
+  if #candidates == 1 then
+    return candidates[1]
+  end
+
+  local items = { "Select main class:" }
+  for i, opt in ipairs(candidates) do
+    local label = opt.mainClass or ""
+    if opt.projectName and opt.projectName ~= "" then
+      label = label .. " [" .. opt.projectName .. "]"
+    end
+    if opt.filePath and opt.filePath ~= "" then
+      label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+    end
+    table.insert(items, string.format("%d. %s", i, label))
+  end
+  local idx = vim.fn.inputlist(items)
+  if idx < 1 or idx > #candidates then
+    return nil
+  end
+  return candidates[idx]
+end
+
+
+function JdtlsRunMain.new(opts)
+  opts = opts or {}
+  local strategy = {
+    bufnr = nil,
+    client_id = opts.client_id,
+    bufnr_hint = opts.bufnr,
+    cwd = opts.cwd,
+    args = opts.args or {},
+    vm_args = opts.vm_args or {},
+    enable_preview = opts.enable_preview or false,
+    wait_timeout_ms = opts.wait_timeout_ms or 30000,
+    request_id = nil,
+    inner = nil,
+    _stopped = false,
+  }
+  setmetatable(strategy, { __index = JdtlsRunMain })
+  return strategy
+end
+
+function JdtlsRunMain:reset()
+  self:stop()
+  if self.inner and self.inner.reset then
+    self.inner:reset()
+  end
+  if self.bufnr and vim.api.nvim_buf_is_valid(self.bufnr) then
+    util.soft_delete_buf(self.bufnr)
+  end
+  self.bufnr = nil
+  self.inner = nil
+end
+
+function JdtlsRunMain:get_bufnr()
+  if self.inner and self.inner.get_bufnr then
+    local bufnr = self.inner:get_bufnr()
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      return bufnr
+    end
+  end
+  return self.bufnr
+end
+
+local function wait_for_client(self, task, hint_bufnr, cb)
+  local started_at = vim.uv.hrtime()
+
+  local function tick()
+    if self._stopped or task:is_complete() then
+      return
+    end
+
+    local client = find_jdtls_client(hint_bufnr, self.client_id)
+    if client and client.initialized ~= false then
+      self.client_id = client.id
+      cb(client)
+      return
+    end
+
+    local elapsed_ms = (vim.uv.hrtime() - started_at) / 1e6
+    if elapsed_ms > self.wait_timeout_ms then
+      append_lines(task, self.bufnr, { "timed out waiting for jdtls" })
+      task:on_exit(1)
+      return
+    end
+
+    vim.defer_fn(tick, 200)
+  end
+
+  tick()
+end
+
+local function cancel_request(client_id, request_id)
+  if not request_id then
+    return
+  end
+  local client = client_id and vim.lsp.get_client_by_id(client_id) or nil
+  if client and client.cancel_request then
+    pcall(function()
+      client:cancel_request(request_id)
+    end)
+  end
+end
+
+function JdtlsRunMain:start(task)
+  self._stopped = false
+
+  local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
+  local file_path = vim.api.nvim_buf_get_name(hint_bufnr)
+
+  if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
+    self.bufnr = vim.api.nvim_create_buf(false, true)
+    vim.bo[self.bufnr].buftype = "nofile"
+    vim.bo[self.bufnr].bufhidden = "wipe"
+    vim.bo[self.bufnr].swapfile = false
+    vim.bo[self.bufnr].modifiable = false
+  end
+
+  set_lines(task, self.bufnr, {
+    "jdtls run main",
+    "waiting for jdtls...",
+    "",
+  })
+
+  wait_for_client(self, task, hint_bufnr, function(client)
+    if task:is_complete() or self._stopped then
+      return
+    end
+
+    self.client_id = client.id
+
+    append_lines(task, self.bufnr, { "vscode.java.resolveMainClass" })
+
+    local ok, req_id = client:request(
+      "workspace/executeCommand",
+      { command = "vscode.java.resolveMainClass", arguments = {} },
+      function(err, result)
+        vim.schedule(function()
+          if task:is_complete() or self._stopped then
+            return
+          end
+
+          if err or type(result) ~= "table" then
+            append_lines(task, self.bufnr, { "resolveMainClass failed" })
+            task:on_exit(1)
+            return
+          end
+
+          local pick = pick_main_class(result, file_path ~= "" and file_path or nil)
+          if not pick or not pick.mainClass then
+            append_lines(task, self.bufnr, { "canceled" })
+            task:on_exit(1)
+            return
+          end
+
+          local short = pick.mainClass:match("([^.]+)$") or pick.mainClass
+          if short and short ~= "" then
+            task.name = short
+            pcall(function()
+              require("overseer.task_list").touch(task)
+            end)
+          end
+
+          local cwd = self.cwd or guess_cwd(pick.filePath)
+          task.cwd = cwd
+
+          append_lines(task, self.bufnr, { "vscode.java.resolveClasspath" })
+          local ok_cp, cp_id = client:request(
+            "workspace/executeCommand",
+            { command = "vscode.java.resolveClasspath", arguments = { pick.mainClass, pick.projectName } },
+            function(cp_err, cp)
+              vim.schedule(function()
+                if task:is_complete() or self._stopped then
+                  return
+                end
+
+                if cp_err or type(cp) ~= "table" then
+                  append_lines(task, self.bufnr, { "resolveClasspath failed" })
+                  task:on_exit(1)
+                  return
+                end
+
+                append_lines(task, self.bufnr, { "vscode.java.resolveJavaExecutable" })
+                local ok_java, java_id = client:request(
+                  "workspace/executeCommand",
+                  {
+                    command = "vscode.java.resolveJavaExecutable",
+                    arguments = { pick.mainClass, pick.projectName },
+                  },
+                  function(java_err, java_exec)
+                    vim.schedule(function()
+                      if task:is_complete() or self._stopped then
+                        return
+                      end
+
+                      if java_err or not java_exec or java_exec == "" then
+                        java_exec = vim.fn.exepath("java")
+                        if java_exec == "" then
+                          java_exec = "java"
+                        end
+                      end
+
+                      local module_paths = as_list(cp[1] or cp[0])
+                      local class_paths = as_list(cp[2] or cp[1])
+
+                      local cmd = { java_exec }
+                      for _, a in ipairs(self.vm_args or {}) do
+                        table.insert(cmd, a)
+                      end
+                      if self.enable_preview then
+                        table.insert(cmd, "--enable-preview")
+                      end
+
+                      local sep = path_sep()
+                      if #module_paths > 0 then
+                        table.insert(cmd, "--module-path")
+                        table.insert(cmd, table.concat(module_paths, sep))
+                      end
+                      if #class_paths > 0 then
+                        table.insert(cmd, "-cp")
+                        table.insert(cmd, table.concat(class_paths, sep))
+                      end
+
+                      table.insert(cmd, pick.mainClass)
+                      for _, a in ipairs(self.args or {}) do
+                        table.insert(cmd, a)
+                      end
+
+                      local cfg = require("overseer.config")
+                      local jobstart = require("overseer.strategy.jobstart")
+                      self.inner = jobstart.new({
+                        use_terminal = cfg.output.use_terminal,
+                        preserve_output = cfg.output.preserve_output,
+                      })
+
+                      local prev_bufnr = self.bufnr
+                      task.cmd = cmd
+                      self.inner:start(task)
+
+                      local next_bufnr = self.inner:get_bufnr()
+                      if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
+                        util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
+                        if vim.api.nvim_buf_is_valid(prev_bufnr) then
+                          util.soft_delete_buf(prev_bufnr)
+                        end
+                      end
+                      self.bufnr = nil
+                    end)
+                  end,
+                  hint_bufnr
+                )
+
+                if ok_java then
+                  self.request_id = java_id
+                else
+                  append_lines(task, self.bufnr, { "failed to send resolveJavaExecutable" })
+                  task:on_exit(1)
+                end
+              end)
+            end,
+            hint_bufnr
+          )
+
+          if ok_cp then
+            self.request_id = cp_id
+          else
+            append_lines(task, self.bufnr, { "failed to send resolveClasspath" })
+            task:on_exit(1)
+          end
+        end)
+      end,
+      hint_bufnr
+    )
+
+    if ok then
+      self.request_id = req_id
+    else
+      append_lines(task, self.bufnr, { "failed to send resolveMainClass" })
+      task:on_exit(1)
+    end
+  end)
+end
+
+function JdtlsRunMain:stop()
+  self._stopped = true
+  cancel_request(self.client_id, self.request_id)
+  self.request_id = nil
+  if self.inner and self.inner.stop then
+    self.inner:stop()
+  end
+end
+
+function JdtlsRunMain:dispose()
+  self:stop()
+  if self.inner and self.inner.dispose then
+    self.inner:dispose()
+  end
+  self.inner = nil
+  if self.bufnr and vim.api.nvim_buf_is_valid(self.bufnr) then
+    util.soft_delete_buf(self.bufnr)
+  end
+  self.bufnr = nil
+end
+
+return JdtlsRunMain

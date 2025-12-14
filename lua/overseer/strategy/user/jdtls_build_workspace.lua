@@ -74,6 +74,55 @@ local function append_lines(task, bufnr, lines)
   end
 end
 
+local function pick_main_class(options, current_file)
+  local candidates = {}
+  for _, opt in ipairs(options or {}) do
+    if current_file and opt.filePath == current_file then
+      table.insert(candidates, opt)
+    end
+  end
+  if #candidates == 0 then
+    candidates = options or {}
+  end
+
+  if #candidates == 0 then
+    return nil
+  end
+
+  if #candidates == 1 then
+    return candidates[1]
+  end
+
+  local items = { "Select main class:" }
+  for i, opt in ipairs(candidates) do
+    local label = opt.mainClass or ""
+    if opt.projectName and opt.projectName ~= "" then
+      label = label .. " [" .. opt.projectName .. "]"
+    end
+    if opt.filePath and opt.filePath ~= "" then
+      label = label .. " - " .. vim.fn.fnamemodify(opt.filePath, ":~:.")
+    end
+    table.insert(items, string.format("%d. %s", i, label))
+  end
+  local idx = vim.fn.inputlist(items)
+  if idx < 1 or idx > #candidates then
+    return nil
+  end
+  return candidates[idx]
+end
+
+local function cancel_request(client_id, request_id)
+  if not request_id then
+    return
+  end
+  local client = client_id and vim.lsp.get_client_by_id(client_id) or nil
+  if client and client.cancel_request then
+    pcall(function()
+      client:cancel_request(request_id)
+    end)
+  end
+end
+
 function JdtlsBuildWorkspace.new(opts)
   opts = opts or {}
   local strategy = {
@@ -84,6 +133,8 @@ function JdtlsBuildWorkspace.new(opts)
     params = opts.params or {},
     continue_on_error = opts.continue_on_error or "always",
     open_qf_on_error = opts.open_qf_on_error ~= false,
+    wait_timeout_ms = opts.wait_timeout_ms or 30000,
+    _stopped = false,
   }
   setmetatable(strategy, { __index = JdtlsBuildWorkspace })
   return strategy
@@ -101,29 +152,19 @@ function JdtlsBuildWorkspace:get_bufnr()
   return self.bufnr
 end
 
-function JdtlsBuildWorkspace:start(task)
-  local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
-  local client = find_jdtls_client(hint_bufnr, self.client_id)
-
-  if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
-    self.bufnr = vim.api.nvim_create_buf(false, true)
-    vim.bo[self.bufnr].buftype = "nofile"
-    vim.bo[self.bufnr].bufhidden = "wipe"
-    vim.bo[self.bufnr].swapfile = false
-    vim.bo[self.bufnr].modifiable = false
+local function open_diagnostics_qf()
+  pcall(vim.diagnostic.setqflist, { severity = vim.diagnostic.severity.ERROR, open = false })
+  local ok_trouble, trouble = pcall(require, "trouble")
+  if ok_trouble then
+    pcall(trouble.open, { mode = "qflist", focus = false })
+  else
+    pcall(vim.cmd, "copen")
   end
+end
 
-  if not client then
-    set_lines(task, self.bufnr, { "jdtls client not found" })
-    vim.schedule(function()
-      task:on_exit(1)
-    end)
-    return
-  end
-
-  self.client_id = client.id
-
+function JdtlsBuildWorkspace:_run_build(task, client, hint_bufnr)
   local params = self.params or {}
+
   set_lines(task, self.bufnr, {
     "vscode.java.buildWorkspace",
     ("mainClass: %s"):format(params.mainClass or ""),
@@ -133,14 +174,6 @@ function JdtlsBuildWorkspace:start(task)
     "",
   })
 
-  if not params.mainClass or params.mainClass == "" then
-    append_lines(task, self.bufnr, { "missing mainClass" })
-    vim.schedule(function()
-      task:on_exit(1)
-    end)
-    return
-  end
-
   local req = {
     command = "vscode.java.buildWorkspace",
     arguments = { json_encode(params) },
@@ -148,7 +181,9 @@ function JdtlsBuildWorkspace:start(task)
 
   local ok, request_id = client:request("workspace/executeCommand", req, function(err, result)
     vim.schedule(function()
-      if task:is_complete() then
+      self.request_id = nil
+
+      if task:is_complete() or self._stopped then
         return
       end
 
@@ -171,12 +206,8 @@ function JdtlsBuildWorkspace:start(task)
         return
       end
 
-      pcall(vim.diagnostic.setqflist, { severity = vim.diagnostic.severity.ERROR, open = false })
-      local ok_trouble, trouble = pcall(require, "trouble")
-      if ok_trouble then
-        pcall(trouble.open, { mode = "qflist", focus = true })
-      else
-        pcall(vim.cmd, "copen")
+      if self.open_qf_on_error and (status == 0 or status == 100) then
+        open_diagnostics_qf()
       end
 
       if self.continue_on_error == "never" then
@@ -198,18 +229,117 @@ function JdtlsBuildWorkspace:start(task)
   self.request_id = request_id
 end
 
-function JdtlsBuildWorkspace:stop()
-  if not self.request_id then
+function JdtlsBuildWorkspace:_ensure_main_class(task, client, hint_bufnr)
+  local params = self.params or {}
+
+  local file_path = params.filePath
+  if not file_path or file_path == "" then
+    local bufname = vim.api.nvim_buf_get_name(hint_bufnr)
+    if bufname ~= "" then
+      file_path = bufname
+      params.filePath = bufname
+      self.params = params
+    end
+  end
+
+  if params.mainClass and params.mainClass ~= "" then
+    self:_run_build(task, client, hint_bufnr)
     return
   end
 
-  local client = self.client_id and vim.lsp.get_client_by_id(self.client_id) or nil
-  if client and client.cancel_request then
-    pcall(function()
-      client:cancel_request(self.request_id)
+  append_lines(task, self.bufnr, { "vscode.java.resolveMainClass" })
+
+  local ok, request_id = client:request(
+    "workspace/executeCommand",
+    { command = "vscode.java.resolveMainClass", arguments = {} },
+    function(err, result)
+      vim.schedule(function()
+        self.request_id = nil
+
+        if task:is_complete() or self._stopped then
+          return
+        end
+
+        if err or type(result) ~= "table" then
+          append_lines(task, self.bufnr, { "resolveMainClass failed" })
+          task:on_exit(1)
+          return
+        end
+
+        local pick = pick_main_class(result, file_path)
+        if not pick or not pick.mainClass then
+          append_lines(task, self.bufnr, { "canceled" })
+          task:on_exit(1)
+          return
+        end
+
+        params.mainClass = pick.mainClass
+        params.projectName = pick.projectName
+        params.filePath = pick.filePath or params.filePath
+        self.params = params
+
+        self:_run_build(task, client, hint_bufnr)
+      end)
+    end,
+    hint_bufnr
+  )
+
+  if not ok then
+    append_lines(task, self.bufnr, { "failed to send resolveMainClass" })
+    vim.schedule(function()
+      task:on_exit(1)
     end)
+    return
   end
 
+  self.request_id = request_id
+end
+
+function JdtlsBuildWorkspace:start(task)
+  self._stopped = false
+
+  local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
+
+  if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
+    self.bufnr = vim.api.nvim_create_buf(false, true)
+    vim.bo[self.bufnr].buftype = "nofile"
+    vim.bo[self.bufnr].bufhidden = "wipe"
+    vim.bo[self.bufnr].swapfile = false
+    vim.bo[self.bufnr].modifiable = false
+  end
+
+  set_lines(task, self.bufnr, { "vscode.java.buildWorkspace", "waiting for jdtls...", "" })
+
+  local started_at = vim.uv.hrtime()
+
+  local function tick()
+    if task:is_complete() or self._stopped then
+      return
+    end
+
+    local client = find_jdtls_client(hint_bufnr, self.client_id)
+    if client and client.initialized ~= false then
+      self.client_id = client.id
+      self:_ensure_main_class(task, client, hint_bufnr)
+      return
+    end
+
+    local elapsed_ms = (vim.uv.hrtime() - started_at) / 1e6
+    if elapsed_ms > self.wait_timeout_ms then
+      append_lines(task, self.bufnr, { "jdtls client not found" })
+      task:on_exit(1)
+      return
+    end
+
+    vim.defer_fn(tick, 200)
+  end
+
+  tick()
+end
+
+function JdtlsBuildWorkspace:stop()
+  self._stopped = true
+  cancel_request(self.client_id, self.request_id)
   self.request_id = nil
 end
 
