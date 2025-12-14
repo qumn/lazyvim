@@ -1,7 +1,4 @@
-local constants = require("overseer.constants")
 local util = require("overseer.util")
-
-local STATUS = constants.STATUS
 
 local JdtlsBuildWorkspace = {}
 
@@ -85,7 +82,7 @@ function JdtlsBuildWorkspace.new(opts)
     client_id = opts.client_id,
     bufnr_hint = opts.bufnr,
     params = opts.params or {},
-    continue_on_error = opts.continue_on_error or "prompt",
+    continue_on_error = opts.continue_on_error or "always",
     open_qf_on_error = opts.open_qf_on_error ~= false,
   }
   setmetatable(strategy, { __index = JdtlsBuildWorkspace })
@@ -174,31 +171,18 @@ function JdtlsBuildWorkspace:start(task)
         return
       end
 
-      if self.continue_on_error == "always" then
-        task:on_exit(0)
-        return
+      pcall(vim.diagnostic.setqflist, { severity = vim.diagnostic.severity.ERROR, open = false })
+      local ok_trouble, trouble = pcall(require, "trouble")
+      if ok_trouble then
+        pcall(trouble.open, { mode = "qflist", focus = true })
+      else
+        pcall(vim.cmd, "copen")
       end
 
       if self.continue_on_error == "never" then
         task:on_exit(1)
-        return
-      end
-
-      if self.open_qf_on_error then
-        pcall(vim.diagnostic.setqflist, { severity = vim.diagnostic.severity.ERROR })
-        pcall(vim.cmd, "copen")
-      end
-
-      local choice = vim.fn.confirm(
-        ("Build has errors (status=%s). Continue?"):format(tostring(status)),
-        "&Continue\n&Cancel",
-        2
-      )
-
-      if choice == 1 then
-        task:on_exit(0)
       else
-        task:on_exit(1)
+        task:on_exit(0)
       end
     end)
   end, hint_bufnr)

@@ -167,8 +167,8 @@ return {
     continue_on_error = {
       desc = "Behavior when build has errors",
       type = "enum",
-      choices = { "prompt", "always", "never" },
-      default = "prompt",
+      choices = { "always", "never" },
+      default = "always",
     },
     open_qf_on_error = {
       desc = "Open quickfix on build error",
@@ -262,31 +262,26 @@ return {
       components = {
         "on_complete_notify",
         "on_exit_set_status",
-        { "open_output", direction = "dock" },
+        { "on_complete_dispose", timeout = 0.5, statuses = { "SUCCESS" } },
+        { "open_output", direction = "dock", on_start = "never", on_complete = "failure" },
       },
     }
 
     local run_task = {
-      name = string.format("run %s", short),
+      name = short,
       cmd = java_cmd,
       cwd = cwd,
       components = {
+        "force_non_ephemeral",
+        { "unique", replace = true },
         "on_complete_notify",
         "on_exit_set_status",
         { "open_output", direction = "dock" },
       },
     }
+    table.insert(build_task.components, { "run_after", tasks = { run_task }, detach = true })
 
-    return {
-      name = string.format("jdtls build+run %s", short),
-      cmd = "jdtls_build_and_run",
-      cwd = cwd,
-      strategy = {
-        "orchestrator",
-        tasks = { build_task, run_task },
-      },
-      components = { "default" },
-    }
+    return build_task
   end,
   condition = {
     filetype = { "java" },

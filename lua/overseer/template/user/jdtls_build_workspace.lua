@@ -109,8 +109,8 @@ return {
     continue_on_error = {
       desc = "Behavior when build has errors",
       type = "enum",
-      choices = { "prompt", "always", "never" },
-      default = "prompt",
+      choices = { "always", "never" },
+      default = "always",
     },
     open_qf_on_error = {
       desc = "Open quickfix on build error",
