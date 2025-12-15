@@ -55,6 +55,7 @@ return {
     opts = function(_, opts)
       -- jdtls cmd flags
       local cmd = opts.cmd
+      table.insert(cmd, "-Xmx4G")
       -- table.insert(cmd, "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false")
       -- table.insert(cmd, "-Dlog.perf.level=OFF")
       -- local project_name = vim.fn.fnamemodify(vim.fn.getcwd(), ":p:h:t")
