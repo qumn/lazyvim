@@ -1,6 +1,4 @@
--- Neovim/Telescope glue: run rg (fast), parse via core, show picker.
-local Job = require("plenary.job")
-
+-- Neovim/Telescope glue: stream rg, parse via core, show picker.
 local pickers = require("telescope.pickers")
 local finders = require("telescope.finders")
 local conf = require("telescope.config").values
@@ -21,8 +19,8 @@ local function project_root()
   return require("lazyvim.util").root()
 end
 
-local function run_rg(root, on_done)
-  local args = {
+local function rg_args()
+  return {
     "--no-heading",
     "--with-filename",
     "-n",
@@ -31,38 +29,6 @@ local function run_rg(root, on_done)
     "@(RequestMapping|GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\\b",
     ".",
   }
-
-  local lines = {}
-  local errs = {}
-
-  ---@diagnostic disable-next-line: missing-fields
-  Job:new({
-    command = "rg",
-    args = args,
-    cwd = root,
-    on_stdout = function(_, line)
-      if line and line ~= "" then
-        table.insert(lines, line)
-      end
-    end,
-    on_stderr = function(_, line)
-      if line and line ~= "" then
-        table.insert(errs, line)
-      end
-    end,
-    on_exit = function(_, code)
-      if code ~= 0 and code ~= 1 then
-        vim.schedule(function()
-          vim.notify("rg failed (" .. tostring(code) .. "):\n" .. table.concat(errs, "\n"), vim.log.levels.ERROR)
-        end)
-        return
-      end
-
-      vim.schedule(function()
-        on_done(lines)
-      end)
-    end,
-  }):start()
 end
 
 local function resolve_opts(opts)
@@ -133,55 +99,70 @@ local function jump_to_method(entry)
   vim.api.nvim_win_set_cursor(win, { line, col })
 end
 
+local function make_streaming_finder(root, entry_builder)
+  local state = core.new_stream_state()
+
+  local function line_to_entry(line)
+    local endpoint = core.ingest_line(state, line)
+    if endpoint then
+      return entry_builder(endpoint)
+    end
+  end
+
+  local cmd = { "rg" }
+  for _, arg in ipairs(rg_args()) do
+    cmd[#cmd + 1] = arg
+  end
+
+  return finders.new_oneshot_job(cmd, {
+    entry_maker = line_to_entry,
+    cwd = root,
+  })
+end
+
 function M.endpoints_picker(opts)
   opts = opts or {}
   local merged_opts = resolve_opts(opts)
   local root = project_root()
 
-  run_rg(root, function(lines)
-    local results = core.parse_rg_lines(lines)
+  local hl_http = merged_opts.hl_http or {}
+  local displayer = make_displayer()
+  local entry_maker = make_entry_maker(root, displayer, hl_http)
+  local finder = make_streaming_finder(root, entry_maker)
 
-    local hl_http = merged_opts.hl_http or {}
-    local displayer = make_displayer()
-    local entry_maker = make_entry_maker(root, displayer, hl_http)
+  pickers
+    .new(opts, {
+      prompt_title = "Spring Endpoints",
+      finder = finder,
+      sorter = conf.generic_sorter(opts),
+      previewer = previewers.vim_buffer_vimgrep.new(opts),
+      attach_mappings = function(prompt_bufnr, map)
+        local function jump()
+          local sel = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          jump_to_method(sel)
+        end
 
-    pickers
-      .new(opts, {
-        prompt_title = "Spring Endpoints",
-        finder = finders.new_table({
-          results = results,
-          entry_maker = entry_maker,
-        }),
-        sorter = conf.generic_sorter(opts),
-        previewer = previewers.vim_buffer_vimgrep.new(opts),
-        attach_mappings = function(prompt_bufnr, map)
-          local function jump()
-            local sel = action_state.get_selected_entry()
-            actions.close(prompt_bufnr)
-            jump_to_method(sel)
+        local function copy()
+          local sel = action_state.get_selected_entry()
+          if not sel then
+            return
           end
+          local e = sel.value
+          local s = string.format("%s %s", e.http, e.path)
+          vim.fn.setreg("+", s)
+          vim.notify("Copied: " .. s)
+        end
 
-          local function copy()
-            local sel = action_state.get_selected_entry()
-            if not sel then
-              return
-            end
-            local e = sel.value
-            local s = string.format("%s %s", e.http, e.path)
-            vim.fn.setreg("+", s)
-            vim.notify("Copied: " .. s)
-          end
+        map("i", "<CR>", jump)
+        map("n", "<CR>", jump)
+        map("i", "<C-y>", copy)
+        map("n", "<C-y>", copy)
 
-          map("i", "<CR>", jump)
-          map("n", "<CR>", jump)
-          map("i", "<C-y>", copy)
-          map("n", "<C-y>", copy)
-
-          return true
-        end,
-      })
-      :find()
-  end)
+        return true
+      end,
+    })
+    :find()
 end
 
 return M

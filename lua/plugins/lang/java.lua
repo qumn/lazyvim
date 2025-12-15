@@ -101,8 +101,8 @@ return {
   },
 
   {
-    dir = "/home/qumn/Workspace/mybatis.nvim",
-    dev = true,
+    dir = "~/Workspace/mybatis.nvim",
+    develop = true,
     ft = { "java", "xml" },
     dependencies = { "neovim/nvim-lspconfig" },
     config = function()

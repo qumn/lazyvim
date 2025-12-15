@@ -28,7 +28,6 @@ end
 
 -- Extract the first string literal "..." from the annotation line.
 local function first_quoted(s)
-  -- minimal non-greedy
   local a, b = s:find('"%g-"')
   if not a then
     return nil
@@ -90,52 +89,72 @@ local function join_path(base, subp)
   end
 end
 
--- opts:
---   class_level_pred(raw_text, trimmed_text) -> boolean
---     default: treat non-indented "@RequestMapping" as class-level base mapping
-function M.parse_rg_lines(lines, opts)
-  opts = opts or {}
+local function default_class_pred(raw)
+  return raw:match("^@RequestMapping") ~= nil
+end
 
-  local class_level_pred = opts.class_level_pred
-    or function(raw, _)
-      -- your heuristic: no indentation => class-level
-      return raw:match("^@RequestMapping") ~= nil
-    end
-
-  local base_by_file = {}
-  local results = {}
-
-  for _, s in ipairs(lines) do
-    local file, lnum, raw = split_rg_line(s)
-    if file then
-      local t = trim(raw)
-
-      -- class-level base mapping
-      if t:match("^@RequestMapping") and class_level_pred(raw, t) then
-        base_by_file[file] = first_quoted(t) or ""
-      else
-        -- method-level mappings
-        if t:match("^@[%w]+Mapping") or t:match("^@RequestMapping") then
-          local http = http_of(t)
-          local subp = first_quoted(t) or ""
-          local base = base_by_file[file] or ""
-          local full = join_path(base, subp)
-
-          table.insert(results, {
-            file = file,
-            lnum = lnum,
-            http = http,
-            path = full,
-            text = t,
-            base = base,
-            sub = subp,
-          })
-        end
-      end
-    end
+local function parse_line(state, raw_line, class_pred)
+  local file, lnum, raw = split_rg_line(raw_line)
+  if not file then
+    return nil
   end
 
-  return results
+  local t = trim(raw)
+
+  if t:match("^@RequestMapping") and class_pred(raw, t) then
+    state.base_by_file[file] = first_quoted(t) or ""
+    return nil
+  end
+
+  if t:match("^@[%w]+Mapping") or t:match("^@RequestMapping") then
+    local http = http_of(t)
+    local subp = first_quoted(t) or ""
+    local base = state.base_by_file[file] or ""
+    local full = join_path(base, subp)
+
+    local item = {
+      file = file,
+      lnum = lnum,
+      http = http,
+      path = full,
+      text = t,
+      base = base,
+      sub = subp,
+    }
+    table.insert(state.results, item)
+    return item
+  end
+
+  return nil
+end
+
+function M.parse_rg_lines(lines, opts)
+  opts = opts or {}
+  local class_pred = opts.class_level_pred or default_class_pred
+
+  local state = {
+    base_by_file = {},
+    results = {},
+  }
+
+  for _, line in ipairs(lines) do
+    parse_line(state, line, class_pred)
+  end
+
+  return state.results
+end
+
+function M.new_stream_state(opts)
+  opts = opts or {}
+  return {
+    base_by_file = {},
+    results = {},
+    class_pred = opts.class_level_pred or default_class_pred,
+  }
+end
+
+function M.ingest_line(state, raw_line)
+  return parse_line(state, raw_line, state.class_pred)
 end
 
 return M
