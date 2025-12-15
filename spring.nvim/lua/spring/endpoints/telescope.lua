@@ -26,10 +26,8 @@ local function run_rg(root, on_done)
     "--no-heading",
     "--with-filename",
     "-n",
-    "--glob",
-    "**/src/main/java/**",
-    "-g",
-    "*Controller.java",
+    "--g",
+    "**/src/main/java/**/*Controller.java",
     "@(RequestMapping|GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\\b",
     ".",
   }
