@@ -22,3 +22,11 @@ vim.g.root_spec = { "lsp", { ".git" }, "cwd" }
 
 -- Detect OS name
 vim.g.os_name = vim.loop.os_uname().sysname
+
+vim.g.ssh = vim.env.SSH_TTY ~= nil or vim.env.SSH_CONNECTION ~= nil or vim.env.SSH_CLIENT ~= nil
+
+-- Use OSC52 clipboard when connected over SSH
+if vim.g.ssh then
+  vim.g.clipboard = "osc52"
+  vim.opt.clipboard = "unnamedplus"
+end
