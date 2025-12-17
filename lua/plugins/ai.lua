@@ -28,6 +28,10 @@ return {
           nav_up = { "<c-i>", "nav_up", expr = true, desc = "navigate to the above window" },
           nav_right = { "<c-o>", "nav_right", expr = true, desc = "navigate to the right window" },
           nav_tab = { "<Tab>", "<Tab>", desc = "Keep Tab to Tab" },
+
+          -- HACK: codex cannot custome key, so we intercept these keys to send to codex
+          codex_stop = { "<c-c>", "<Esc>", desc = "stop codex generation" },
+          codex_esc = { "<Esc>", "<C-\\><C-n>", desc = "escape to normal mode" },
         },
       },
     },
