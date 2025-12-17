@@ -6,6 +6,7 @@
 vim.opt.list = true
 vim.opt.listchars = "tab:> ,trail:▫"
 vim.opt.termguicolors = true
+vim.opt.jumpoptions = "stack"
 
 vim.g.gui_font_default_size = 18
 vim.g.gui_font_size = vim.g.gui_font_default_size

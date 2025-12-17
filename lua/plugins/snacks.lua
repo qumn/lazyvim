@@ -9,6 +9,7 @@ end
 return {
   "folke/snacks.nvim",
   opts = {
+    scope = { enable = false },
     picker = {
       win = {
         input = {
