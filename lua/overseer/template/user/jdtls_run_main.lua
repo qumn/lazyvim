@@ -104,7 +104,12 @@ return {
         "on_complete_notify",
         "on_exit_set_status",
         { "on_complete_dispose", timeout = 0.5, statuses = { "SUCCESS" } },
-        { "open_output", direction = "dock", on_start = "always", on_complete = "failure" },
+        {
+          "open_output_keymaps",
+          direction = "dock",
+          on_start = "always",
+          on_complete = "failure",
+        },
       },
     }
 
@@ -125,7 +130,10 @@ return {
         { "unique", replace = true },
         "on_complete_notify",
         "on_exit_set_status",
-        { "open_output", direction = "dock" },
+        {
+          "open_output_keymaps",
+          direction = "dock",
+        },
       },
     }
 

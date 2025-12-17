@@ -3,10 +3,7 @@ local util = require("overseer.util")
 local JdtlsRunMain = {}
 
 local function list_clients()
-  if vim.lsp.get_clients then
-    return vim.lsp.get_clients()
-  end
-  return vim.lsp.get_active_clients()
+  return vim.lsp.get_clients()
 end
 
 local function find_jdtls_client(bufnr, preferred_id)
@@ -181,34 +178,36 @@ local function pick_main_class(options, current_file, cb)
     local actions = require("telescope.actions")
     local action_state = require("telescope.actions.state")
 
-    pickers.new({}, {
-      prompt_title = "Select main class",
-      finder = finders.new_table({
-        results = candidates,
-        entry_maker = function(item)
-          local display = format_main_class_item(item)
-          return {
-            value = item,
-            display = display,
-            ordinal = display,
-          }
-        end,
-      }),
-      sorter = conf.generic_sorter({}),
-      attach_mappings = function(prompt_bufnr, _)
-        actions.select_default:replace(function()
-          local selection = action_state.get_selected_entry()
-          finish(selection and selection.value or nil)
-          actions.close(prompt_bufnr)
-        end)
-        actions.close:enhance({
-          post = function()
-            finish(nil)
+    pickers
+      .new({}, {
+        prompt_title = "Select main class",
+        finder = finders.new_table({
+          results = candidates,
+          entry_maker = function(item)
+            local display = format_main_class_item(item)
+            return {
+              value = item,
+              display = display,
+              ordinal = display,
+            }
           end,
-        })
-        return true
-      end,
-    }):find()
+        }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, _)
+          actions.select_default:replace(function()
+            local selection = action_state.get_selected_entry()
+            finish(selection and selection.value or nil)
+            actions.close(prompt_bufnr)
+          end)
+          actions.close:enhance({
+            post = function()
+              finish(nil)
+            end,
+          })
+          return true
+        end,
+      })
+      :find()
     return
   end
 
@@ -219,7 +218,6 @@ local function pick_main_class(options, current_file, cb)
     finish(item)
   end)
 end
-
 
 function JdtlsRunMain.new(opts)
   opts = opts or {}
@@ -371,76 +369,74 @@ function JdtlsRunMain:start(task)
             end
 
             append_lines(task, self.bufnr, { "vscode.java.resolveJavaExecutable" })
-            local ok_java, java_id = client:request(
-              "workspace/executeCommand",
-              {
-                command = "vscode.java.resolveJavaExecutable",
-                arguments = { pick.mainClass, pick.projectName },
-              },
-              function(java_err, java_exec)
-                vim.schedule(function()
-                  self.request_id = nil
+            local ok_java, java_id = client:request("workspace/executeCommand", {
+              command = "vscode.java.resolveJavaExecutable",
+              arguments = { pick.mainClass, pick.projectName },
+            }, function(java_err, java_exec)
+              vim.schedule(function()
+                self.request_id = nil
 
-                  if task:is_complete() or self._stopped then
-                    return
+                if task:is_complete() or self._stopped then
+                  return
+                end
+
+                if java_err or not java_exec or java_exec == "" then
+                  java_exec = vim.fn.exepath("java")
+                  if java_exec == "" then
+                    java_exec = "java"
                   end
+                end
 
-                  if java_err or not java_exec or java_exec == "" then
-                    java_exec = vim.fn.exepath("java")
-                    if java_exec == "" then
-                      java_exec = "java"
-                    end
+                local module_paths = as_list(cp[1] or cp[0])
+                local class_paths = as_list(cp[2] or cp[1])
+
+                local cmd = { java_exec }
+                for _, a in ipairs(self.vm_args or {}) do
+                  table.insert(cmd, a)
+                end
+                if self.enable_preview then
+                  table.insert(cmd, "--enable-preview")
+                end
+
+                local sep = path_sep()
+                if #module_paths > 0 then
+                  table.insert(cmd, "--module-path")
+                  table.insert(cmd, table.concat(module_paths, sep))
+                end
+                if #class_paths > 0 then
+                  table.insert(cmd, "-cp")
+                  table.insert(cmd, table.concat(class_paths, sep))
+                end
+
+                table.insert(cmd, pick.mainClass)
+                for _, a in ipairs(self.args or {}) do
+                  table.insert(cmd, a)
+                end
+
+                local cfg = require("overseer.config")
+                local jobstart = require("overseer.strategy.jobstart")
+                self.inner = jobstart.new({
+                  use_terminal = cfg.output.use_terminal,
+                  preserve_output = cfg.output.preserve_output,
+                })
+
+                local prev_bufnr = self.bufnr
+                task.cmd = cmd
+                self.inner:start(task)
+
+                local next_bufnr = self.inner:get_bufnr()
+                if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
+                  util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
+                  if vim.api.nvim_buf_is_valid(prev_bufnr) then
+                    util.soft_delete_buf(prev_bufnr)
                   end
-
-                  local module_paths = as_list(cp[1] or cp[0])
-                  local class_paths = as_list(cp[2] or cp[1])
-
-                  local cmd = { java_exec }
-                  for _, a in ipairs(self.vm_args or {}) do
-                    table.insert(cmd, a)
-                  end
-                  if self.enable_preview then
-                    table.insert(cmd, "--enable-preview")
-                  end
-
-                  local sep = path_sep()
-                  if #module_paths > 0 then
-                    table.insert(cmd, "--module-path")
-                    table.insert(cmd, table.concat(module_paths, sep))
-                  end
-                  if #class_paths > 0 then
-                    table.insert(cmd, "-cp")
-                    table.insert(cmd, table.concat(class_paths, sep))
-                  end
-
-                  table.insert(cmd, pick.mainClass)
-                  for _, a in ipairs(self.args or {}) do
-                    table.insert(cmd, a)
-                  end
-
-                  local cfg = require("overseer.config")
-                  local jobstart = require("overseer.strategy.jobstart")
-                  self.inner = jobstart.new({
-                    use_terminal = cfg.output.use_terminal,
-                    preserve_output = cfg.output.preserve_output,
-                  })
-
-                  local prev_bufnr = self.bufnr
-                  task.cmd = cmd
-                  self.inner:start(task)
-
-                  local next_bufnr = self.inner:get_bufnr()
-                  if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
-                    util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
-                    if vim.api.nvim_buf_is_valid(prev_bufnr) then
-                      util.soft_delete_buf(prev_bufnr)
-                    end
-                  end
-                  self.bufnr = nil
-                end)
-              end,
-              hint_bufnr
-            )
+                end
+                if next_bufnr and vim.api.nvim_buf_is_valid(next_bufnr) then
+                  task:dispatch("on_bufnr_changed", { prev = prev_bufnr, next = next_bufnr })
+                end
+                self.bufnr = nil
+              end)
+            end, hint_bufnr)
 
             if ok_java then
               self.request_id = java_id
@@ -488,7 +484,6 @@ function JdtlsRunMain:start(task)
           pick_main_class(result, file_path ~= "" and file_path or nil, function(pick)
             continue_with_pick(pick)
           end)
-
         end)
       end,
       hint_bufnr

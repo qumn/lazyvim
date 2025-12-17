@@ -72,7 +72,12 @@ return {
       components = {
         "on_complete_notify",
         "on_exit_set_status",
-        { "open_output", direction = "dock", on_start = "always", on_complete = "failure" },
+        {
+          "open_output_keymaps",
+          direction = "dock",
+          on_start = "always",
+          on_complete = "failure",
+        },
       },
     }
   end,

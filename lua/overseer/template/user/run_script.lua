@@ -23,7 +23,7 @@ return {
         "on_complete_notify",
         "on_output_summarize",
         "on_result_diagnostics",
-        { "open_output", direction = "dock" },
+        { "open_output_keymaps", direction = "dock" },
       },
     }
   end,
