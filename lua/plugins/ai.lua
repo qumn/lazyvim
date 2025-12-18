@@ -106,6 +106,8 @@ return {
           spinner = {},
         },
       })
+
+      require("integrations.codecompanion.elapsed").setup()
     end,
   },
 }
