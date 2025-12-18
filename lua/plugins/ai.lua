@@ -32,6 +32,8 @@ return {
           -- HACK: codex cannot custome key, so we intercept these keys to send to codex
           codex_stop = { "<c-c>", "<Esc>", desc = "stop codex generation" },
           codex_esc = { "<Esc>", "<C-\\><C-n>", desc = "escape to normal mode" },
+          codex_newline = { "<Enter>", "<C-j>", desc = "insert newline" },
+          codex_send = { "<C-Enter>", "<Enter>", desc = "send prompt" },
         },
       },
     },
