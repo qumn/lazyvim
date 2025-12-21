@@ -96,7 +96,8 @@ return {
           ["n"] = "MoveDown",
           ["i"] = "MoveUp",
           ["o"] = "Toggle",
-          ["l"] = "OpenTree",
+          ["O"] = "OpenTree",
+          ["l"] = false,
           ["k"] = false,
         },
         popup = {
