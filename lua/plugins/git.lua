@@ -126,6 +126,8 @@ return {
       local actions = require("diffview.actions")
       local lib = require("diffview.lib")
       local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
+      local RevType = require("diffview.vcs.rev").RevType
+      local RevType = require("diffview.vcs.rev").RevType
 
       local function smart_next()
         local before = vim.api.nvim_win_get_cursor(0)
@@ -149,12 +151,31 @@ return {
         end
       end
 
+      local function with_right_win(layout, fn)
+        if not (layout and layout.b and layout.b.id) then
+          return false
+        end
+
+        local right_win = layout.b.id
+        if not vim.api.nvim_win_is_valid(right_win) then
+          return false
+        end
+
+        local cursor = vim.api.nvim_win_get_cursor(0)
+        vim.api.nvim_win_call(right_win, function()
+          pcall(vim.api.nvim_win_set_cursor, right_win, cursor)
+          fn(right_win)
+        end)
+
+        return true
+      end
+
       local function diff2_discard()
+        ---@type any
         local view = lib.get_current_view()
         if not (view and view:instanceof(DiffView)) then
           return
         end
-        ---@cast view DiffView
 
         local file = view:infer_cur_file(false) or view.cur_entry
         if not file then
@@ -177,22 +198,89 @@ return {
         end
 
         local left_buf = layout.a.file and layout.a.file.bufnr
-        local right_win = layout.b.id
-        if not (left_buf and right_win and vim.api.nvim_buf_is_valid(left_buf)) then
+        if not (left_buf and vim.api.nvim_buf_is_valid(left_buf)) then
           return
         end
 
-        local cursor = vim.api.nvim_win_get_cursor(0)
-        vim.api.nvim_win_call(right_win, function()
-          if vim.api.nvim_win_is_valid(right_win) then
-            pcall(vim.api.nvim_win_set_cursor, right_win, cursor)
-          end
+        if not with_right_win(layout, function()
           vim.cmd("diffget " .. left_buf)
-        end)
+        end) then
+          return
+        end
 
         layout:sync_scroll()
       end
 
+      local function diff2_stage()
+        ---@type any
+        local view = lib.get_current_view()
+        if not (view and view:instanceof(DiffView)) then
+          return
+        end
+
+        local layout = view.cur_layout
+        if not (layout and layout.a and layout.b and layout.a.file and layout.b.file) then
+          return
+        end
+
+        local left_rev = layout.a.file.rev
+        local right_rev = layout.b.file.rev
+        if not (left_rev and right_rev) then
+          return
+        end
+
+        if right_rev.type == RevType.STAGE and left_rev.type == RevType.COMMIT then
+          with_right_win(layout, function()
+            vim.cmd("diffget")
+          end)
+        else
+          with_right_win(layout, function()
+            vim.cmd("diffput")
+          end)
+        end
+      end
+
+      local function diff2_write_both()
+        ---@type any
+        local view = lib.get_current_view()
+        if not (view and view:instanceof(DiffView)) then
+          return
+        end
+
+        local layout = view.cur_layout
+        if not (layout and layout.a and layout.b and layout.a.file and layout.b.file) then
+          return
+        end
+
+        local function write_win(win, file)
+          if not (win and file and file.rev) then
+            return
+          end
+          local rtype = file.rev.type
+          if rtype ~= RevType.LOCAL and rtype ~= RevType.STAGE then
+            return
+          end
+          if not vim.api.nvim_win_is_valid(win.id) then
+            return
+          end
+          vim.api.nvim_win_call(win.id, function()
+            local prev = vim.o.eventignore
+            local next_ignore = prev
+            if not next_ignore:match("(^|,)BufWritePre($|,)") then
+              next_ignore = (next_ignore == "" and "BufWritePre") or (next_ignore .. ",BufWritePre")
+            end
+            if not next_ignore:match("(^|,)BufWritePost($|,)") then
+              next_ignore = (next_ignore == "" and "BufWritePost") or (next_ignore .. ",BufWritePost")
+            end
+            vim.o.eventignore = next_ignore
+            pcall(vim.cmd, "write")
+            vim.o.eventignore = prev
+          end)
+        end
+
+        write_win(layout.a, layout.a.file)
+        write_win(layout.b, layout.b.file)
+      end
       return {
         keymaps = {
           view = {
@@ -208,7 +296,8 @@ return {
           diff2 = {
             -- stylua: ignore start
             { "n", "x", diff2_discard, { desc = "Discard hunk / delete untracked" } },
-            -- { "n", "a", require("utils.difftool").accept_hunk, { desc = "Accept Hunk (stage/unstage)" } },
+            { "n", "s", diff2_stage,   { desc = "Stage/Unstage hunk" } },
+            { "n", "<c-s>", diff2_write_both, { desc = "Write worktree/index without autocmd" } },
           },
           file_panel = {
             -- stylua: ignore start
