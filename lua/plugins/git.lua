@@ -132,6 +132,24 @@ return {
         file_panel = {
           listing_style = "list",
         },
+        hooks = {
+          view_opened = function(view)
+            -- Null diff buffers don't receive diff keymaps; set q on all view windows.
+            local tabpage = view and view.tabpage
+            if not (tabpage and vim.api.nvim_tabpage_is_valid(tabpage)) then
+              return
+            end
+            for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+              local bufnr = vim.api.nvim_win_get_buf(winid)
+              vim.keymap.set("n", "q", actions.close, {
+                buffer = bufnr,
+                silent = true,
+                nowait = true,
+                desc = "Close Diffview",
+              })
+            end
+          end,
+        },
         keymaps = {
           view = {
             -- stylua: ignore start
@@ -153,6 +171,7 @@ return {
             { "n", "x", fns.diff2_discard, { desc = "Discard hunk / delete untracked" } },
             { "n", "s", fns.diff2_stage,   { desc = "Stage/Unstage hunk" } },
             { "n", "<c-s>", fns.diff2_write_both, { desc = "Write worktree/index without autocmd" } },
+            -- stylua: ignore end
           },
           file_panel = {
             -- stylua: ignore start
