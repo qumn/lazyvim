@@ -41,8 +41,8 @@ return {
       map("n", "<leader>ghR", gs.reset_buffer, "Reset Buffer")
       map("n", "<leader>ghp", gs.preview_hunk_inline, "Preview Hunk Inline")
       map("n", "<leader>ghb", function() gs.blame_line({ full = true }) end, "Blame Line")
-      map("n", "<leader>ghd", gs.diffthis, "Diff This")
-      map("n", "<leader>ghD", function() gs.diffthis("~") end, "Diff This ~")
+        -- map("n", "<leader>ghd", gs.diffthis, "Diff This")
+        -- map("n", "<leader>ghD", function() gs.diffthis("~") end, "Diff This ~")
         -- map({ "o", "x" }, "ih", ":<C-U>Gitsigns select_hunk<CR>", "GitSigns Select Hunk")
         -- stylua: ignore end
       end,
@@ -97,6 +97,7 @@ return {
           ["i"] = "MoveUp",
           ["o"] = "Toggle",
           ["l"] = "OpenTree",
+          ["k"] = false,
         },
         popup = {
           ["n"] = false,
@@ -127,6 +128,9 @@ return {
       local difftool = require("integrations.diffview.difftool")
       local fns = difftool.diffview_fns(actions)
       return {
+        file_panel = {
+          listing_style = "list",
+        },
         keymaps = {
           view = {
             -- stylua: ignore start
@@ -140,6 +144,7 @@ return {
             { "n", "<c-d>",     actions.scroll_view(0.25),         { desc = "Scroll the view down" } },
             { "n", "g<",        function() vim.cmd("diffget") end, { desc = "Reject hunk (diffget)" } },
             { "n", "g>",        function() vim.cmd("diffput") end, { desc = "Apply hunk (diffput)" } },
+            { "n", "h",         false },
             -- stylua: ignore end
           },
           diff2 = {
@@ -157,6 +162,7 @@ return {
             { "n", "l",         actions.listing_style,      { desc = "Toggle between 'list' and 'tree' views" } },
             { "n", "<c-u>",     actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
             { "n", "<c-d>",     actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
+            { "n", "h",         false },
             -- stylua: ignore end
           },
           file_history_panel = {
@@ -166,6 +172,7 @@ return {
             { "n", "i", actions.prev_entry, { desc = "Bring the cursor to the previous file entry" } },
             { "n", "<c-u>", actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
             { "n", "<c-d>", actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
+            { "n", "h",         false },
             -- stylua: ignore end
           },
         },
