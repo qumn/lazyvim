@@ -52,7 +52,7 @@ return {
     "esmuellert/vscode-diff.nvim",
     dependencies = { "MunifTanjim/nui.nvim" },
     cmd = "CodeDiff",
-    disable = true,
+    enabled = false,
     opts = {
       -- Keymaps in diff view
       keymaps = {
@@ -122,6 +122,8 @@ return {
     },
     opts = function()
       local actions = require("diffview.actions")
+      local lib = require("diffview.lib")
+      local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
 
       local function smart_next()
         local before = vim.api.nvim_win_get_cursor(0)
@@ -145,6 +147,50 @@ return {
         end
       end
 
+      local function diff2_discard()
+        local view = lib.get_current_view()
+        if not (view and view:instanceof(DiffView)) then
+          return
+        end
+        ---@cast view DiffView
+
+        local file = view:infer_cur_file(false) or view.cur_entry
+        if not file then
+          return
+        end
+
+        if file.status == "?" then
+          local ok = vim.fn.delete(file.absolute_path, "rf")
+          if ok == 0 then
+            actions.refresh_files()
+          else
+            vim.notify(("Failed to delete: %s"):format(file.absolute_path), vim.log.levels.ERROR)
+          end
+          return
+        end
+
+        local layout = view.cur_layout
+        if not (layout and layout.a and layout.b) then
+          return
+        end
+
+        local left_buf = layout.a.file and layout.a.file.bufnr
+        local right_win = layout.b.id
+        if not (left_buf and right_win and vim.api.nvim_buf_is_valid(left_buf)) then
+          return
+        end
+
+        local cursor = vim.api.nvim_win_get_cursor(0)
+        vim.api.nvim_win_call(right_win, function()
+          if vim.api.nvim_win_is_valid(right_win) then
+            pcall(vim.api.nvim_win_set_cursor, right_win, cursor)
+          end
+          vim.cmd("diffget " .. left_buf)
+        end)
+
+        layout:sync_scroll()
+      end
+
       return {
         keymaps = {
           view = {
@@ -159,6 +205,11 @@ return {
             { "n", "<c-d>",     actions.scroll_view(0.25),         { desc = "Scroll the view down" } },
             { "n", "g<",        function() vim.cmd("diffget") end, { desc = "Reject hunk (diffget)" } },
             { "n", "g>",        function() vim.cmd("diffput") end, { desc = "Apply hunk (diffput)" } },
+            -- stylua: ignore end
+          },
+          diff2 = {
+            -- stylua: ignore start
+            { "n", "x", diff2_discard, { desc = "Discard hunk / delete untracked" } },
             -- stylua: ignore end
           },
           file_panel = {
