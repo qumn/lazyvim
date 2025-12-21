@@ -124,7 +124,7 @@ return {
     },
     opts = function()
       local actions = require("diffview.actions")
-      local difftool = require("utils.difftool")
+      local difftool = require("integrations.diffview.difftool")
       local fns = difftool.diffview_fns(actions)
       return {
         keymaps = {
