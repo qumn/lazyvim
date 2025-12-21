@@ -52,6 +52,7 @@ return {
     "esmuellert/vscode-diff.nvim",
     dependencies = { "MunifTanjim/nui.nvim" },
     cmd = "CodeDiff",
+    disable = true,
     opts = {
       -- Keymaps in diff view
       keymaps = {
@@ -74,5 +75,111 @@ return {
       { "<Leader>gd", mode = "n", "<CMD>CodeDiff<CR>", desc = "Open CodeDiff" },
       { "<Leader>gf", mode = "n", "<CMD>CodeDiff file HEAD<CR>", desc = "CodeDiff Current Buffer" },
     },
+  },
+  {
+    "NeogitOrg/neogit",
+    lazy = true,
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "sindrets/diffview.nvim",
+      "nvim-telescope/telescope.nvim",
+    },
+    cmd = "Neogit",
+    keys = {
+      { "<leader>gg", "<cmd>Neogit<cr>", desc = "Show Neogit UI" },
+    },
+    opts = {
+      mappings = {
+        status = {
+          ["n"] = "MoveDown",
+          ["i"] = "MoveUp",
+          ["o"] = "Toggle",
+          ["l"] = "OpenTree",
+        },
+        popup = {
+          ["n"] = false,
+          ["i"] = false,
+          ["r"] = "IgnorePopup",
+          ["k"] = "RebasePopup",
+        },
+      },
+    },
+  },
+  {
+    "sindrets/diffview.nvim",
+    cmd = {
+      "DiffviewOpen",
+      "DiffviewClose",
+      "DiffviewFocusFiles",
+      "DiffviewFileHistory",
+      "DiffviewToggleFiles",
+      "DiffviewFocusFiles",
+      "DiffviewLog",
+    },
+    keys = {
+      { "<Leader>gd", mode = "n", "<CMD>DiffviewOpen<CR>", desc = "Open Diffview" },
+      { "<Leader>gf", mode = "n", "<CMD>DiffviewFileHistory %<CR>", desc = "Diffview Current Buffer" },
+    },
+    opts = function()
+      local actions = require("diffview.actions")
+
+      local function smart_next()
+        local before = vim.api.nvim_win_get_cursor(0)
+        vim.cmd("normal! ]c")
+        local after = vim.api.nvim_win_get_cursor(0)
+        if before[1] == after[1] and before[2] == after[2] then
+          actions.select_next_entry()
+          vim.cmd("normal! gg")
+          vim.cmd("normal! ]c")
+        end
+      end
+
+      local function smart_prev()
+        local before = vim.api.nvim_win_get_cursor(0)
+        vim.cmd("normal! [c")
+        local after = vim.api.nvim_win_get_cursor(0)
+        if before[1] == after[1] and before[2] == after[2] then
+          actions.select_prev_entry()
+          vim.cmd("normal! G")
+          vim.cmd("normal! [c")
+        end
+      end
+
+      return {
+        keymaps = {
+          view = {
+            -- stylua: ignore start
+            { "n", "[h",        smart_prev,                        { desc = "Go to previous hunk" } },
+            { "n", "]h",        smart_next,                        { desc = "Go to next hunk" } },
+            { "n", "I",         smart_prev,                        { desc = "Go to previous hunk" } },
+            { "n", "N",         smart_next,                        { desc = "Go to next hunk" } },
+            { "n", "q",         actions.close,                     { desc = "Close Diffview" } },
+            { "n", "<leader>e", actions.toggle_files,              { desc = "Toggle the file panel." } },
+            { "n", "<c-u>",     actions.scroll_view(-0.25),        { desc = "Scroll the view up" } },
+            { "n", "<c-d>",     actions.scroll_view(0.25),         { desc = "Scroll the view down" } },
+            { "n", "g<",        function() vim.cmd("diffget") end, { desc = "Reject hunk (diffget)" } },
+            { "n", "g>",        function() vim.cmd("diffput") end, { desc = "Apply hunk (diffput)" } },
+            -- stylua: ignore end
+          },
+          file_panel = {
+            -- stylua: ignore start
+            { "n", "<leader>e", actions.toggle_files,       { desc = "Toggle the file panel." } },
+            { "n", "n",         actions.next_entry,         { desc = "Bring the cursor to the next file entry" } },
+            { "n", "i",         actions.prev_entry,         { desc = "Bring the cursor to the previous file entry" } },
+            { "n", "l",         actions.listing_style,      { desc = "Toggle between 'list' and 'tree' views" } },
+            { "n", "<c-u>",     actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
+            { "n", "<c-d>",     actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
+            -- stylua: ignore end
+          },
+          file_history_panel = {
+            -- stylua: ignore start
+            { "n", "q", actions.close,      { desc = "Close Diffview" } },
+            { "n", "n", actions.next_entry, { desc = "Bring the cursor to the next file entry" } },
+            { "n", "i", actions.prev_entry, { desc = "Bring the cursor to the previous file entry" } },
+            -- stylua: ignore end
+          },
+        },
+      }
+    end,
   },
 }
