@@ -124,180 +124,29 @@ return {
     },
     opts = function()
       local actions = require("diffview.actions")
-      local lib = require("diffview.lib")
-      local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
-      local RevType = require("diffview.vcs.rev").RevType
-      local RevType = require("diffview.vcs.rev").RevType
-
-      local function smart_next()
-        local before = vim.api.nvim_win_get_cursor(0)
-        vim.cmd("normal! ]c")
-        local after = vim.api.nvim_win_get_cursor(0)
-        if before[1] == after[1] and before[2] == after[2] then
-          actions.select_next_entry()
-          vim.cmd("normal! gg")
-          vim.cmd("normal! ]c")
-        end
-      end
-
-      local function smart_prev()
-        local before = vim.api.nvim_win_get_cursor(0)
-        vim.cmd("normal! [c")
-        local after = vim.api.nvim_win_get_cursor(0)
-        if before[1] == after[1] and before[2] == after[2] then
-          actions.select_prev_entry()
-          vim.cmd("normal! G")
-          vim.cmd("normal! [c")
-        end
-      end
-
-      local function with_right_win(layout, fn)
-        if not (layout and layout.b and layout.b.id) then
-          return false
-        end
-
-        local right_win = layout.b.id
-        if not vim.api.nvim_win_is_valid(right_win) then
-          return false
-        end
-
-        local cursor = vim.api.nvim_win_get_cursor(0)
-        vim.api.nvim_win_call(right_win, function()
-          pcall(vim.api.nvim_win_set_cursor, right_win, cursor)
-          fn(right_win)
-        end)
-
-        return true
-      end
-
-      local function diff2_discard()
-        ---@type any
-        local view = lib.get_current_view()
-        if not (view and view:instanceof(DiffView)) then
-          return
-        end
-
-        local file = view:infer_cur_file(false) or view.cur_entry
-        if not file then
-          return
-        end
-
-        if file.status == "?" then
-          local ok = vim.fn.delete(file.absolute_path, "rf")
-          if ok == 0 then
-            actions.refresh_files()
-          else
-            vim.notify(("Failed to delete: %s"):format(file.absolute_path), vim.log.levels.ERROR)
-          end
-          return
-        end
-
-        local layout = view.cur_layout
-        if not (layout and layout.a and layout.b) then
-          return
-        end
-
-        local left_buf = layout.a.file and layout.a.file.bufnr
-        if not (left_buf and vim.api.nvim_buf_is_valid(left_buf)) then
-          return
-        end
-
-        if not with_right_win(layout, function()
-          vim.cmd("diffget " .. left_buf)
-        end) then
-          return
-        end
-
-        layout:sync_scroll()
-      end
-
-      local function diff2_stage()
-        ---@type any
-        local view = lib.get_current_view()
-        if not (view and view:instanceof(DiffView)) then
-          return
-        end
-
-        local layout = view.cur_layout
-        if not (layout and layout.a and layout.b and layout.a.file and layout.b.file) then
-          return
-        end
-
-        local left_rev = layout.a.file.rev
-        local right_rev = layout.b.file.rev
-        if not (left_rev and right_rev) then
-          return
-        end
-
-        if right_rev.type == RevType.STAGE and left_rev.type == RevType.COMMIT then
-          with_right_win(layout, function()
-            vim.cmd("diffget")
-          end)
-        else
-          with_right_win(layout, function()
-            vim.cmd("diffput")
-          end)
-        end
-      end
-
-      local function diff2_write_both()
-        ---@type any
-        local view = lib.get_current_view()
-        if not (view and view:instanceof(DiffView)) then
-          return
-        end
-
-        local layout = view.cur_layout
-        if not (layout and layout.a and layout.b and layout.a.file and layout.b.file) then
-          return
-        end
-
-        local function write_win(win, file)
-          if not (win and file and file.rev) then
-            return
-          end
-          local rtype = file.rev.type
-          if rtype ~= RevType.LOCAL and rtype ~= RevType.STAGE then
-            return
-          end
-          if not vim.api.nvim_win_is_valid(win.id) then
-            return
-          end
-          vim.api.nvim_win_call(win.id, function()
-            local prev = vim.o.eventignore
-            local next_ignore = prev
-            if not next_ignore:match("(^|,)BufWritePre($|,)") then
-              next_ignore = (next_ignore == "" and "BufWritePre") or (next_ignore .. ",BufWritePre")
-            end
-            if not next_ignore:match("(^|,)BufWritePost($|,)") then
-              next_ignore = (next_ignore == "" and "BufWritePost") or (next_ignore .. ",BufWritePost")
-            end
-            vim.o.eventignore = next_ignore
-            pcall(vim.cmd, "write")
-            vim.o.eventignore = prev
-          end)
-        end
-
-        write_win(layout.a, layout.a.file)
-        write_win(layout.b, layout.b.file)
-      end
+      local difftool = require("utils.difftool")
+      local fns = difftool.diffview_fns(actions)
       return {
         keymaps = {
           view = {
             -- stylua: ignore start
-            { "n", "[h",        smart_prev,                        { desc = "Go to previous hunk" } },
-            { "n", "]h",        smart_next,                        { desc = "Go to next hunk" } },
-            { "n", "I",         smart_prev,                        { desc = "Go to previous hunk" } },
-            { "n", "N",         smart_next,                        { desc = "Go to next hunk" } },
+            { "n", "[h",        fns.smart_prev,                    { desc = "Go to previous hunk" } },
+            { "n", "]h",        fns.smart_next,                    { desc = "Go to next hunk" } },
+            { "n", "I",         fns.smart_prev,                    { desc = "Go to previous hunk" } },
+            { "n", "N",         fns.smart_next,                    { desc = "Go to next hunk" } },
             { "n", "q",         actions.close,                     { desc = "Close Diffview" } },
             { "n", "<leader>e", actions.toggle_files,              { desc = "Toggle the file panel." } },
+            { "n", "<c-u>",     actions.scroll_view(-0.25),        { desc = "Scroll the view up" } },
+            { "n", "<c-d>",     actions.scroll_view(0.25),         { desc = "Scroll the view down" } },
+            { "n", "g<",        function() vim.cmd("diffget") end, { desc = "Reject hunk (diffget)" } },
+            { "n", "g>",        function() vim.cmd("diffput") end, { desc = "Apply hunk (diffput)" } },
             -- stylua: ignore end
           },
           diff2 = {
             -- stylua: ignore start
-            { "n", "x", diff2_discard, { desc = "Discard hunk / delete untracked" } },
-            { "n", "s", diff2_stage,   { desc = "Stage/Unstage hunk" } },
-            { "n", "<c-s>", diff2_write_both, { desc = "Write worktree/index without autocmd" } },
+            { "n", "x", fns.diff2_discard, { desc = "Discard hunk / delete untracked" } },
+            { "n", "s", fns.diff2_stage,   { desc = "Stage/Unstage hunk" } },
+            { "n", "<c-s>", fns.diff2_write_both, { desc = "Write worktree/index without autocmd" } },
           },
           file_panel = {
             -- stylua: ignore start
@@ -315,8 +164,8 @@ return {
             { "n", "q", actions.close,      { desc = "Close Diffview" } },
             { "n", "n", actions.next_entry, { desc = "Bring the cursor to the next file entry" } },
             { "n", "i", actions.prev_entry, { desc = "Bring the cursor to the previous file entry" } },
-            { "n", "<c-u>",     actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
-            { "n", "<c-d>",     actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
+            { "n", "<c-u>", actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
+            { "n", "<c-d>", actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
             -- stylua: ignore end
           },
         },
