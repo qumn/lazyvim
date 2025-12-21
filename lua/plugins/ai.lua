@@ -49,6 +49,7 @@ return {
             codex_esc = { "<Esc>", "<C-\\><C-n>", desc = "escape to normal mode" },
             codex_newline = { "<Enter>", "<C-j>", desc = "insert newline" },
             codex_send = { "<C-Enter>", "<Enter>", desc = "send prompt" },
+            codex_send2 = { "<C-S>", "<Enter>", desc = "send prompt" },
           },
         },
       },

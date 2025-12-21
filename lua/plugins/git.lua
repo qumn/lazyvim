@@ -3,6 +3,8 @@ return {
     "lewis6991/gitsigns.nvim",
     event = "LazyFile",
     opts = {
+      attach_to_untracked = true,
+      signs_staged_enable = true,
       signs = {
         add = { text = "▎" },
         change = { text = "▎" },
@@ -201,20 +203,17 @@ return {
             { "n", "N",         smart_next,                        { desc = "Go to next hunk" } },
             { "n", "q",         actions.close,                     { desc = "Close Diffview" } },
             { "n", "<leader>e", actions.toggle_files,              { desc = "Toggle the file panel." } },
-            { "n", "<c-u>",     actions.scroll_view(-0.25),        { desc = "Scroll the view up" } },
-            { "n", "<c-d>",     actions.scroll_view(0.25),         { desc = "Scroll the view down" } },
-            { "n", "g<",        function() vim.cmd("diffget") end, { desc = "Reject hunk (diffget)" } },
-            { "n", "g>",        function() vim.cmd("diffput") end, { desc = "Apply hunk (diffput)" } },
             -- stylua: ignore end
           },
           diff2 = {
             -- stylua: ignore start
             { "n", "x", diff2_discard, { desc = "Discard hunk / delete untracked" } },
-            -- stylua: ignore end
+            -- { "n", "a", require("utils.difftool").accept_hunk, { desc = "Accept Hunk (stage/unstage)" } },
           },
           file_panel = {
             -- stylua: ignore start
             { "n", "<leader>e", actions.toggle_files,       { desc = "Toggle the file panel." } },
+            { "n", "q",         actions.close,              { desc = "Close Diffview" } },
             { "n", "n",         actions.next_entry,         { desc = "Bring the cursor to the next file entry" } },
             { "n", "i",         actions.prev_entry,         { desc = "Bring the cursor to the previous file entry" } },
             { "n", "l",         actions.listing_style,      { desc = "Toggle between 'list' and 'tree' views" } },
@@ -227,6 +226,8 @@ return {
             { "n", "q", actions.close,      { desc = "Close Diffview" } },
             { "n", "n", actions.next_entry, { desc = "Bring the cursor to the next file entry" } },
             { "n", "i", actions.prev_entry, { desc = "Bring the cursor to the previous file entry" } },
+            { "n", "<c-u>",     actions.scroll_view(-0.25), { desc = "Scroll the view up" } },
+            { "n", "<c-d>",     actions.scroll_view(0.25),  { desc = "Scroll the view down" } },
             -- stylua: ignore end
           },
         },
