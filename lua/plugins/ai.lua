@@ -25,6 +25,24 @@ return {
         tools = {
           -- ensure tools exist so env merging runs
           codex = {},
+          -- WAIT: the pr https://github.com/folke/sidekick.nvim/pull/206
+          -- Second Codex slot for running multiple Codex sessions; uses env+is_proc to keep session detection unambiguous.
+          codex2 = {
+            cmd = { "codex", "--enable", "web_search_request" },
+            env = { SIDEKICK_CODEX_SLOT = "2" },
+            is_proc = function(_, proc)
+              return proc.cmd:match("%f[%w]codex%f[%W]") ~= nil and proc.env and proc.env.SIDEKICK_CODEX_SLOT == "2"
+            end,
+            url = "https://github.com/openai/codex",
+          },
+          codex3 = {
+            cmd = { "codex", "--enable", "web_search_request" },
+            env = { SIDEKICK_CODEX_SLOT = "3" },
+            is_proc = function(_, proc)
+              return proc.cmd:match("%f[%w]codex%f[%W]") ~= nil and proc.env and proc.env.SIDEKICK_CODEX_SLOT == "3"
+            end,
+            url = "https://github.com/openai/codex",
+          },
           opencode = {},
         },
         win = {
