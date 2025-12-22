@@ -34,3 +34,24 @@
 --     LazyVim.toggle.inlay_hints(vim.api.nvim_get_current_buf(), true)
 --   end,
 -- })
+
+local group = vim.api.nvim_create_augroup("custom_everforest_hl", { clear = true })
+local function apply_everforest()
+  local config = vim.fn["everforest#get_configuration"]()
+  local p = vim.fn["everforest#get_palette"](config.background, config.colors_override)
+  local set = vim.fn["everforest#highlight"]
+
+  set("DiffText", p.blue, p.bg5)
+end
+
+vim.api.nvim_create_autocmd("ColorScheme", {
+  group = group,
+  pattern = "everforest",
+  callback = function()
+    apply_everforest()
+  end,
+})
+
+if vim.g.colors_name == "everforest" then
+  vim.schedule(apply_everforest)
+end
