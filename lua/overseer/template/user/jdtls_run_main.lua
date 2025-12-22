@@ -33,6 +33,39 @@ local function guess_short_name(file_path)
   return base
 end
 
+-- because neovim terminal hard wraps lines, so we need to unwrap them manually
+local function copy_unwrapped_log_selection()
+  -- visual 选区
+  local _, ls = unpack(vim.fn.getpos("'<"))
+  local _, le = unpack(vim.fn.getpos("'>"))
+  local lines = vim.api.nvim_buf_get_lines(0, ls - 1, le, false)
+
+  local function is_new_entry(line)
+    return line:match("^%d%d%d%d%-%d%d%-%d%d%s+%d%d:%d%d:%d%d") ~= nil or line:match("^%[%u+%]") ~= nil
+  end
+
+  local out = {}
+  for _, line in ipairs(lines) do
+    if #out == 0 then
+      table.insert(out, line)
+    else
+      if is_new_entry(line) then
+        table.insert(out, line)
+      else
+        out[#out] = out[#out] .. " " .. vim.trim(line)
+      end
+    end
+  end
+
+  local result = table.concat(out, "\n")
+
+  -- 写入剪贴板和匿名寄存器
+  vim.fn.setreg("+", result)
+  vim.fn.setreg('"', result)
+
+  vim.notify("Unwrapped log copied to clipboard", vim.log.levels.INFO)
+end
+
 return {
   name = "Java: Run Main",
   desc = "Build then run main class",
@@ -133,6 +166,13 @@ return {
         {
           "open_output_keymaps",
           direction = "dock",
+          keymaps = {
+            ["gy"] = {
+              callback = copy_unwrapped_log_selection,
+              mode = "v",
+              desc = "Copy unwrapped log (no buffer change)",
+            },
+          },
         },
       },
     }
