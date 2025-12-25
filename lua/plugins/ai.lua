@@ -21,6 +21,7 @@ return {
         mux = {
           backend = "tmux",
           enabled = true,
+          create = "split",
         },
         tools = {
           -- ensure tools exist so env merging runs

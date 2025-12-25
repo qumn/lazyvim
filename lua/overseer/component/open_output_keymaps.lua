@@ -16,6 +16,11 @@ local default_keymaps = {
     mode = { "n", "t" },
     desc = "Close task list",
   },
+  ["<Esc>"] = {
+    callback = "<C-\\><C-n>",
+    mode = "t",
+    desc = "Normal mode",
+  },
 }
 
 ---@param bufnr integer
