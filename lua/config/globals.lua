@@ -1,3 +1,7 @@
+if vim.env.MASON == nil or vim.env.MASON == "" then
+  vim.env.MASON = vim.fn.stdpath("data") .. "/mason"
+end
+
 _G.Timeit = function(target, opts)
   opts = opts or {}
   local label = opts.label or "Timeit"

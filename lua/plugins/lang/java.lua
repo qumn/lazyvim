@@ -49,12 +49,63 @@ local function is_mybatis_mapper_file(buf)
   return name:match("Mapper%.java$") or name:match("Mapper%.xml$")
 end
 
+local function mason_root()
+  return vim.fn.stdpath("data") .. "/mason"
+end
+
+local function jdtls_executable()
+  local exe = vim.fn.exepath("jdtls")
+  if exe ~= "" then
+    return exe
+  end
+
+  local data = vim.fn.stdpath("data")
+  local mason = data .. "/mason/bin/jdtls"
+  if vim.uv.fs_stat(mason) then
+    return mason
+  end
+
+  if vim.fn.has("win32") == 1 then
+    local mason_cmd = mason .. ".cmd"
+    if vim.uv.fs_stat(mason_cmd) then
+      return mason_cmd
+    end
+  end
+
+  return "jdtls"
+end
+
+local function jdtls_has_asm_9_9()
+  local plugins_dir = mason_root() .. "/packages/jdtls/plugins"
+  local handle = vim.uv.fs_scandir(plugins_dir)
+  if not handle then
+    return false
+  end
+  while true do
+    local name, typ = vim.uv.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+    if typ == "file" and name:match("^org%.objectweb%.asm_9%.9%.[0-9]+%.jar$") then
+      return true
+    end
+  end
+  return false
+end
+
+local function java_test_installed()
+  return vim.uv.fs_stat(mason_root() .. "/packages/java-test") ~= nil
+end
+
 return {
   {
     "mfussenegger/nvim-jdtls",
     opts = function(_, opts)
-      -- jdtls cmd flags
-      local cmd = opts.cmd
+      local cmd = vim.deepcopy(opts.cmd or {})
+      if cmd[1] == nil or cmd[1] == "" then
+        cmd[1] = jdtls_executable()
+      end
+
       table.insert(cmd, "-Xmx4G")
       -- table.insert(cmd, "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false")
       -- table.insert(cmd, "-Dlog.perf.level=OFF")
@@ -64,18 +115,22 @@ return {
       -- macOS: pin the java executable used to run jdtls (JDK 21)
       if is_macos() then
         local j21 = java_home("21")
-        table.insert(cmd, "--java-executable=" .. j21 .. "/bin/java")
+        if j21 and j21 ~= "" then
+          table.insert(cmd, "--java-executable=" .. j21 .. "/bin/java")
+        end
       end
 
       -- jdtls settings
       local extra = {
+        cmd = cmd,
+        test = java_test_installed() and jdtls_has_asm_9_9(),
         settings = {
           java = {
             configuration = {
               runtimes = {
-                { name = "jdk8", path = java_home("1.8") },
-                { name = "jdk17", path = java_home("17") },
-                { name = "jdk21", path = java_home("21") },
+                { name = "JavaSE-1.8", path = java_home("1.8") },
+                { name = "JavaSE-17", path = java_home("17") },
+                { name = "JavaSE-21", path = java_home("21") },
               },
             },
           },

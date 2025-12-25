@@ -1,38 +1,7 @@
 local util = require("overseer.util")
+local jdtls_bootstrap = require("overseer.strategy.user.jdtls_bootstrap")
 
 local JdtlsBuildWorkspace = {}
-
-local function list_clients()
-  if vim.lsp.get_clients then
-    return vim.lsp.get_clients()
-  end
-  return vim.lsp.get_active_clients()
-end
-
-local function find_jdtls_client(bufnr, preferred_id)
-  if preferred_id then
-    local c = vim.lsp.get_client_by_id(preferred_id)
-    if c then
-      return c
-    end
-  end
-
-  if bufnr and bufnr > 0 then
-    for _, c in ipairs(list_clients()) do
-      if c.name == "jdtls" and c.attached_buffers and c.attached_buffers[bufnr] then
-        return c
-      end
-    end
-  end
-
-  for _, c in ipairs(list_clients()) do
-    if c.name == "jdtls" then
-      return c
-    end
-  end
-
-  return nil
-end
 
 local function json_encode(obj)
   if vim.json and vim.json.encode then
@@ -419,6 +388,7 @@ function JdtlsBuildWorkspace:start(task)
   self._stopped = false
 
   local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
+  local root_dir = task and task.cwd or nil
 
   if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
     self.bufnr = vim.api.nvim_create_buf(false, true)
@@ -437,16 +407,25 @@ function JdtlsBuildWorkspace:start(task)
       return
     end
 
-    local client = find_jdtls_client(hint_bufnr, self.client_id)
+    local client = jdtls_bootstrap.find_jdtls_client(hint_bufnr, self.client_id, root_dir)
     if client and client.initialized ~= false then
       self.client_id = client.id
-      self:_ensure_main_class(task, client, hint_bufnr)
+      local req_bufnr = jdtls_bootstrap.pick_request_bufnr(client, hint_bufnr)
+      self:_ensure_main_class(task, client, req_bufnr)
       return
     end
 
     local elapsed_ms = (vim.uv.hrtime() - started_at) / 1e6
     if elapsed_ms > self.wait_timeout_ms then
-      append_lines(task, self.bufnr, { "jdtls client not found" })
+      local lines = { "jdtls client not found" }
+      local clients = vim.lsp.get_clients and vim.lsp.get_clients() or {}
+      for _, c in ipairs(clients or {}) do
+        if c and c.name then
+          local rd = (c.config and c.config.root_dir) or c.root_dir or ""
+          table.insert(lines, ("- %s (id=%s) root=%s"):format(c.name, tostring(c.id), tostring(rd)))
+        end
+      end
+      append_lines(task, self.bufnr, lines)
       task:on_exit(1)
       return
     end
@@ -454,6 +433,7 @@ function JdtlsBuildWorkspace:start(task)
     vim.defer_fn(tick, 200)
   end
 
+  jdtls_bootstrap.ensure_jdtls_started({ root_dir = root_dir, bufnr = hint_bufnr, client_id = self.client_id })
   tick()
 end
 

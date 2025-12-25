@@ -1,35 +1,7 @@
 local util = require("overseer.util")
+local jdtls_bootstrap = require("overseer.strategy.user.jdtls_bootstrap")
 
 local JdtlsRunMain = {}
-
-local function list_clients()
-  return vim.lsp.get_clients()
-end
-
-local function find_jdtls_client(bufnr, preferred_id)
-  if preferred_id then
-    local c = vim.lsp.get_client_by_id(preferred_id)
-    if c then
-      return c
-    end
-  end
-
-  if bufnr and bufnr > 0 then
-    for _, c in ipairs(list_clients()) do
-      if c.name == "jdtls" and c.attached_buffers and c.attached_buffers[bufnr] then
-        return c
-      end
-    end
-  end
-
-  for _, c in ipairs(list_clients()) do
-    if c.name == "jdtls" then
-      return c
-    end
-  end
-
-  return nil
-end
 
 local function set_lines(task, bufnr, lines)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
@@ -263,13 +235,14 @@ end
 
 local function wait_for_client(self, task, hint_bufnr, cb)
   local started_at = vim.uv.hrtime()
+  local root_dir = task and task.cwd or self.cwd
 
   local function tick()
     if self._stopped or task:is_complete() then
       return
     end
 
-    local client = find_jdtls_client(hint_bufnr, self.client_id)
+    local client = jdtls_bootstrap.find_jdtls_client(hint_bufnr, self.client_id, root_dir)
     if client and client.initialized ~= false then
       self.client_id = client.id
       cb(client)
@@ -278,7 +251,15 @@ local function wait_for_client(self, task, hint_bufnr, cb)
 
     local elapsed_ms = (vim.uv.hrtime() - started_at) / 1e6
     if elapsed_ms > self.wait_timeout_ms then
-      append_lines(task, self.bufnr, { "timed out waiting for jdtls" })
+      local lines = { "timed out waiting for jdtls" }
+      local clients = vim.lsp.get_clients and vim.lsp.get_clients() or {}
+      for _, c in ipairs(clients or {}) do
+        if c and c.name then
+          local rd = (c.config and c.config.root_dir) or c.root_dir or ""
+          table.insert(lines, ("- %s (id=%s) root=%s"):format(c.name, tostring(c.id), tostring(rd)))
+        end
+      end
+      append_lines(task, self.bufnr, lines)
       task:on_exit(1)
       return
     end
@@ -286,6 +267,7 @@ local function wait_for_client(self, task, hint_bufnr, cb)
     vim.defer_fn(tick, 200)
   end
 
+  jdtls_bootstrap.ensure_jdtls_started({ root_dir = root_dir, bufnr = hint_bufnr, client_id = self.client_id })
   tick()
 end
 
@@ -327,6 +309,7 @@ function JdtlsRunMain:start(task)
     end
 
     self.client_id = client.id
+    local req_bufnr = jdtls_bootstrap.pick_request_bufnr(client, hint_bufnr)
 
     local function continue_with_pick(pick)
       if task:is_complete() or self._stopped then
@@ -415,10 +398,10 @@ function JdtlsRunMain:start(task)
 
                 local cfg = require("overseer.config")
                 local jobstart = require("overseer.strategy.jobstart")
-                self.inner = jobstart.new({
-                  use_terminal = cfg.output.use_terminal,
-                  preserve_output = cfg.output.preserve_output,
-                })
+              self.inner = jobstart.new({
+                use_terminal = cfg.output.use_terminal,
+                preserve_output = cfg.output.preserve_output,
+              })
 
                 local prev_bufnr = self.bufnr
                 task.cmd = cmd
@@ -436,7 +419,7 @@ function JdtlsRunMain:start(task)
                 end
                 self.bufnr = nil
               end)
-            end, hint_bufnr)
+            end, req_bufnr)
 
             if ok_java then
               self.request_id = java_id
@@ -446,7 +429,7 @@ function JdtlsRunMain:start(task)
             end
           end)
         end,
-        hint_bufnr
+        req_bufnr
       )
 
       if ok_cp then
@@ -486,7 +469,7 @@ function JdtlsRunMain:start(task)
           end)
         end)
       end,
-      hint_bufnr
+      req_bufnr
     )
 
     if ok then
