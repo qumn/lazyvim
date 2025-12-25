@@ -37,8 +37,8 @@ return {
           -- Map them separately to keep <Tab> as <Tab>.
           tab = { "<Tab>", [[<Tab>]], desc = "Keep Tab is Tab", expr = true, mode = "t" },
 
-          hide_slash = { "<C-/>", "hide", desc = "Hide Terminal", mode = { "t", "n" } },
-          hide_underscore = { "<c-_>", "hide", desc = "which_key_ignore", mode = { "t", "n" } },
+          -- hide_slash = { "<C-/>", "hide", desc = "Hide Terminal", mode = { "t", "n" } },
+          -- hide_underscore = { "<c-_>", "hide", desc = "which_key_ignore", mode = { "t", "n" } },
         },
       },
     },

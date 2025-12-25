@@ -103,3 +103,65 @@ end
 
 -- Call function on startup to set default value
 ResetGuiFont()
+
+local bottom = require("integrations.layout.bottom")
+local bottom_owner_snacks = "snacks_terminal"
+local bottom_owner_overseer = "overseer_dock"
+
+local function hide_overseer_dock()
+  local ok, window = pcall(require, "overseer.window")
+  if ok and window.is_open() then
+    window.close()
+    bottom.clear(bottom_owner_overseer)
+    return true
+  end
+  return false
+end
+
+local function hide_snacks_terminals()
+  local ok, snacks = pcall(require, "snacks")
+  if not ok or not snacks.terminal then
+    return false
+  end
+  local hidden = false
+  for _, term in ipairs(snacks.terminal.list() or {}) do
+    if term:valid() and term.opts and term.opts.position == "bottom" then
+      term:hide()
+      hidden = true
+    end
+  end
+  if hidden then
+    bottom.clear(bottom_owner_snacks)
+  end
+  return hidden
+end
+
+local function snacks_bottom_visible()
+  local ok, snacks = pcall(require, "snacks")
+  if not ok or not snacks.terminal then
+    return false
+  end
+  for _, term in ipairs(snacks.terminal.list() or {}) do
+    if term:win_valid() and term.opts and term.opts.position == "bottom" then
+      return true
+    end
+  end
+  return false
+end
+
+local function toggle_bottom_terminal()
+  if snacks_bottom_visible() then
+    hide_snacks_terminals()
+    return
+  end
+  bottom.hide_other(bottom_owner_snacks)
+  hide_overseer_dock()
+  local ok, snacks = pcall(require, "snacks")
+  if ok and snacks.terminal then
+    snacks.terminal()
+    bottom.register(bottom_owner_snacks, hide_snacks_terminals)
+  end
+end
+
+vim.keymap.set({ "n", "t" }, "<C-/>", toggle_bottom_terminal, { desc = "Toggle bottom terminal" })
+vim.keymap.set({ "n", "t" }, "<C-_>", toggle_bottom_terminal, { desc = "which_key_ignore" })
