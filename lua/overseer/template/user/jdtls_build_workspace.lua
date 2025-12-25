@@ -26,6 +26,7 @@ return {
   name = "Java: Build",
   desc = "Build current project",
   tags = { overseer.TAG.BUILD },
+  hide = true,
   params = {
     full_build = {
       desc = "Set isFullBuild=true",
