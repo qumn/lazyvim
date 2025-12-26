@@ -22,7 +22,18 @@ return {
     },
     opts = function(_, opts)
       local actions = require("telescope.actions")
+      local trouble_telescope = require("trouble.sources.telescope")
+      local function open_with_trouble_focus(prompt_bufnr)
+        trouble_telescope.open(prompt_bufnr, { focus = true, source = "telescope" })
+        vim.schedule(function()
+          local mode = trouble_telescope.mode()
+          ---@diagnostic disable-next-line: missing-parameter, missing-fields
+          require("trouble").first({ mode = mode, focus = true, source = "telescope" })
+        end)
+      end
+
       local prev = "<C-i>"
+
       return vim.tbl_extend("force", opts, {
         defaults = {
           theme = "ivy",
@@ -52,6 +63,7 @@ return {
               ["<C-s>"] = actions.select_horizontal,
               ["<C-n>"] = actions.move_selection_next,
               [prev] = actions.move_selection_previous,
+              ["<C-q>"] = open_with_trouble_focus,
             },
             n = {
               ["n"] = actions.move_selection_next,
@@ -61,6 +73,7 @@ return {
               ["O"] = actions.move_to_bottom,
               ["s"] = actions.select_horizontal,
               ["v"] = actions.select_vertical,
+              ["<C-q>"] = open_with_trouble_focus,
             },
           },
         },
