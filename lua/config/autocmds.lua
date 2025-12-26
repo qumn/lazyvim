@@ -55,3 +55,38 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 if vim.g.colors_name == "everforest" then
   vim.schedule(apply_everforest)
 end
+
+-- If a tab ends up with only Overseer panes, close the tab to avoid Overseer becoming the last window.
+vim.api.nvim_create_autocmd("WinClosed", {
+  group = vim.api.nvim_create_augroup("OverseerCloseIfLastWindow", { clear = true }),
+  callback = function()
+    local winids = vim.api.nvim_tabpage_list_wins(0)
+    local panes = {}
+    for _, winid in ipairs(winids) do
+      local cfg = vim.api.nvim_win_get_config(winid)
+      if not cfg.relative or cfg.relative == "" then
+        table.insert(panes, winid)
+      end
+    end
+    if #panes == 0 then
+      return
+    end
+    for _, winid in ipairs(panes) do
+      local bufnr = vim.api.nvim_win_get_buf(winid)
+      local ft = vim.bo[bufnr].filetype
+      if ft ~= "OverseerList" and not vim.b[bufnr].overseer_task then
+        return
+      end
+      if vim.bo[bufnr].modified then
+        return
+      end
+    end
+    vim.schedule(function()
+      local target = panes[1]
+      if target and vim.api.nvim_win_is_valid(target) then
+        pcall(vim.api.nvim_set_current_win, target)
+      end
+      pcall(vim.cmd.quit)
+    end)
+  end,
+})
