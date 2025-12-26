@@ -1,9 +1,4 @@
 -- ---------- helpers ----------
-local function is_macos()
-  ---@diagnostic disable-next-line: undefined-field
-  return vim.g.os_name == "Darwin"
-end
-
 local function trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
@@ -49,6 +44,19 @@ local function is_mybatis_mapper_file(buf)
   return name:match("Mapper%.java$") or name:match("Mapper%.xml$")
 end
 
+local function preferred_java_executable()
+  for _, version in ipairs({ "25", "21", "17" }) do
+    local home = java_home(version)
+    if home and home ~= "" then
+      local java_exe = home .. "/bin/java"
+      if vim.uv.fs_stat(java_exe) then
+        return java_exe
+      end
+    end
+  end
+  return nil
+end
+
 return {
   {
     "mfussenegger/nvim-jdtls",
@@ -62,10 +70,9 @@ return {
       -- local project_name = vim.fn.fnamemodify(vim.fn.getcwd(), ":p:h:t")
       -- local data_dir = vim.fn.stdpath("cache") .. "jdtls/" .. project_name
 
-      -- macOS: pin the java executable used to run jdtls (JDK 21)
-      if is_macos() then
-        local j21 = java_home("21")
-        table.insert(cmd, "--java-executable=" .. j21 .. "/bin/java")
+      local java_exe = preferred_java_executable()
+      if java_exe then
+        table.insert(cmd, "--java-executable=" .. java_exe)
       end
 
       -- jdtls settings
