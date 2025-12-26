@@ -409,6 +409,8 @@ function JdtlsRunMain:start(task)
 
                 local next_bufnr = self.inner:get_bufnr()
                 if prev_bufnr and next_bufnr and prev_bufnr ~= next_bufnr then
+                  vim.b[next_bufnr].overseer_task = task.id
+                  vim.bo[next_bufnr].buflisted = false
                   util.replace_buffer_in_wins(prev_bufnr, next_bufnr)
                   if vim.api.nvim_buf_is_valid(prev_bufnr) then
                     util.soft_delete_buf(prev_bufnr)
