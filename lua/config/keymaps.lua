@@ -106,17 +106,6 @@ ResetGuiFont()
 
 local bottom = require("integrations.layout.bottom")
 local bottom_owner_snacks = "snacks_terminal"
-local bottom_owner_overseer = "overseer_dock"
-
-local function hide_overseer_dock()
-  local ok, window = pcall(require, "overseer.window")
-  if ok and window.is_open() then
-    window.close()
-    bottom.clear(bottom_owner_overseer)
-    return true
-  end
-  return false
-end
 
 local function hide_snacks_terminals()
   local ok, snacks = pcall(require, "snacks")
@@ -155,7 +144,6 @@ local function toggle_bottom_terminal()
     return
   end
   bottom.hide_other(bottom_owner_snacks)
-  hide_overseer_dock()
   local ok, snacks = pcall(require, "snacks")
   if ok and snacks.terminal then
     snacks.terminal()

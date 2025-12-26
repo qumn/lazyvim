@@ -41,7 +41,7 @@ local function apply_everforest()
   local p = vim.fn["everforest#get_palette"](config.background, config.colors_override)
   local set = vim.fn["everforest#highlight"]
 
-  set("DiffText", p.blue, p.bg5)
+  set("DiffText", p.blue, p.bg5, "bold")
 end
 
 vim.api.nvim_create_autocmd("ColorScheme", {

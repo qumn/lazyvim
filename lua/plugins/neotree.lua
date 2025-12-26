@@ -1,7 +1,18 @@
 return {
   "nvim-neo-tree/neo-tree.nvim",
+  opts_extend = { "open_files_do_not_replace_types" },
   opts = {
     close_if_last_window = true,
+    open_files_do_not_replace_types = {
+      "terminal",
+      "Trouble",
+      "trouble",
+      "qf",
+      "Outline",
+      "edgy",
+      "OverseerList",
+      "OverseerForm",
+    },
     filesystem = {
       group_empty_dirs = true,
       scan_mode = "deep",
