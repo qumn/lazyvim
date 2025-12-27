@@ -25,6 +25,32 @@ return {
   end,
   config = function()
     local overseer = require("overseer")
+    local function clear_task_output()
+      local ok, sidebar = pcall(require, "overseer.task_list.sidebar")
+      if not ok then
+        return
+      end
+      local sb = sidebar.get()
+      if not sb then
+        return
+      end
+      local task = sb:get_task_from_line()
+      if not task then
+        return
+      end
+      local bufnr = task:get_bufnr()
+      if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+        return
+      end
+      local modifiable = vim.bo[bufnr].modifiable
+      if not modifiable then
+        vim.bo[bufnr].modifiable = true
+      end
+      pcall(vim.api.nvim_buf_set_lines, bufnr, 0, -1, false, { "" })
+      if not modifiable then
+        vim.bo[bufnr].modifiable = false
+      end
+    end
 
     -- make spring-boot:run tasks unique,
     -- so that OverseerRun would behave like Restart
@@ -59,7 +85,7 @@ return {
           ["<C-h>"] = false,
           ["<C-j>"] = false,
           ["<C-k>"] = false,
-          ["<C-l>"] = false,
+          ["<C-l>"] = { callback = clear_task_output, mode = "n", desc = "Clear task output" },
         },
       },
       component_aliases = {

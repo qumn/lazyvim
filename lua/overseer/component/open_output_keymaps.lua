@@ -1,6 +1,21 @@
 local constants = require("overseer.constants")
 local STATUS = constants.STATUS
 
+---@param bufnr integer|nil
+local function clear_output_buffer(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  local modifiable = vim.bo[bufnr].modifiable
+  if not modifiable then
+    vim.bo[bufnr].modifiable = true
+  end
+  pcall(vim.api.nvim_buf_set_lines, bufnr, 0, -1, false, { "" })
+  if not modifiable then
+    vim.bo[bufnr].modifiable = false
+  end
+end
+
 local function close_task_list_or_window()
   local ok, window = pcall(require, "overseer.window")
   if ok and window.is_open() then
@@ -20,6 +35,13 @@ local default_keymaps = {
     callback = "<C-\\><C-n>",
     mode = "t",
     desc = "Normal mode",
+  },
+  ["<C-l>"] = {
+    callback = function()
+      clear_output_buffer(vim.api.nvim_get_current_buf())
+    end,
+    mode = { "n", "t" },
+    desc = "Clear output",
   },
 }
 
