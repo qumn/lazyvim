@@ -1,5 +1,6 @@
 return {
   "stevearc/overseer.nvim",
+  dependencies = { { "m00qek/baleia.nvim", lazy = true } },
   cmd = { "OverseerRun", "OverseerToggle" },
   -- stylua: ignore
   keys = {
@@ -25,6 +26,7 @@ return {
   end,
   config = function()
     local overseer = require("overseer")
+    require("integrations.overseer.color_output").setup()
     local function clear_task_output()
       local ok, sidebar = pcall(require, "overseer.task_list.sidebar")
       if not ok then
@@ -65,7 +67,7 @@ return {
 
     overseer.setup({
       dap = false,
-      output = { use_terminal = true, preserve_width = true },
+      output = { use_terminal = false, preserve_width = true },
       templates = { "builtin", "user.run_script" },
       task_list = {
         direction = "bottom",
