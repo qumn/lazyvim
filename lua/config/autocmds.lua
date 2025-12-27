@@ -60,6 +60,9 @@ end
 vim.api.nvim_create_autocmd("WinClosed", {
   group = vim.api.nvim_create_augroup("OverseerCloseIfLastWindow", { clear = true }),
   callback = function()
+    if vim.t.overseer_allow_solo then
+      return
+    end
     local winids = vim.api.nvim_tabpage_list_wins(0)
     local panes = {}
     for _, winid in ipairs(winids) do

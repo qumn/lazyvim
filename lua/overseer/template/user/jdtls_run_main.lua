@@ -119,8 +119,9 @@ local function copy_unwrapped_log_selection()
 end
 
 local function template_defn()
+  local template_name = "Java: Run Main"
   return {
-  name = "Java: Run Main",
+  name = template_name,
   desc = "Build then run main class",
   tags = { overseer.TAG.RUN },
   params = {
@@ -164,6 +165,11 @@ local function template_defn()
       type = "string",
       optional = true,
     },
+    main = {
+      desc = "Main class selection",
+      type = "opaque",
+      optional = true,
+    },
   },
   builder = function(params)
     local bufnr = vim.api.nvim_get_current_buf()
@@ -171,19 +177,28 @@ local function template_defn()
 
     local cwd = params.cwd or guess_cwd(current_file)
     local short = guess_short_name(current_file)
+    local run_params = vim.tbl_extend("force", vim.deepcopy(params), { cwd = cwd })
+    local main = params.main
+    local build_file_path = main and main.filePath or (current_file ~= "" and current_file or nil)
 
     local build_task = {
       name = "buildWorkspace",
       cmd = "jdtls_build_workspace",
       cwd = cwd,
+      metadata = {
+        jdtls_run_main_params = run_params,
+        jdtls_run_main_template = template_name,
+      },
       strategy = {
         "user.jdtls_build_workspace",
         bufnr = bufnr,
         continue_on_error = params.continue_on_error,
         open_qf_on_error = params.open_qf_on_error,
         params = {
-          filePath = current_file ~= "" and current_file or nil,
+          filePath = build_file_path,
           isFullBuild = params.full_build,
+          mainClass = main and main.mainClass or nil,
+          projectName = main and main.projectName or nil,
         },
       },
       components = {
@@ -203,6 +218,10 @@ local function template_defn()
       name = short,
       cmd = "jdtls_run_main",
       cwd = cwd,
+      metadata = {
+        jdtls_run_main_params = run_params,
+        jdtls_run_main_template = template_name,
+      },
       strategy = {
         "user.jdtls_run_main",
         bufnr = bufnr,
@@ -210,6 +229,7 @@ local function template_defn()
         args = params.args,
         vm_args = params.vm_args,
         enable_preview = params.enable_preview,
+        main = main,
       },
       components = {
         "force_non_ephemeral",

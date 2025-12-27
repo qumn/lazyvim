@@ -365,6 +365,12 @@ function JdtlsBuildWorkspace:_ensure_main_class(task, client, hint_bufnr)
           params.projectName = pick.projectName
           params.filePath = pick.filePath or params.filePath
           self.params = params
+          if task.metadata and type(task.metadata.jdtls_run_main_params) == "table" then
+            task.metadata.jdtls_run_main_params.main = vim.deepcopy(pick)
+          end
+          if task.from_template and type(task.from_template.params) == "table" then
+            task.from_template.params.main = vim.deepcopy(pick)
+          end
 
           self:_run_build(task, client, hint_bufnr)
         end)
@@ -389,6 +395,21 @@ function JdtlsBuildWorkspace:start(task)
 
   local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
   local root_dir = task and task.cwd or nil
+  if task and task.metadata and type(task.metadata.jdtls_run_main_params) ~= "table" then
+    local params = {}
+    if task.from_template and type(task.from_template.params) == "table" then
+      params = vim.deepcopy(task.from_template.params)
+    end
+    params.cwd = params.cwd or task.cwd
+    if params.main == nil and self.params and self.params.mainClass then
+      params.main = {
+        mainClass = self.params.mainClass,
+        projectName = self.params.projectName,
+        filePath = self.params.filePath,
+      }
+    end
+    task.metadata.jdtls_run_main_params = params
+  end
 
   if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
     self.bufnr = vim.api.nvim_create_buf(false, true)

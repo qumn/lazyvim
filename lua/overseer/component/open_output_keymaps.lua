@@ -43,6 +43,13 @@ local default_keymaps = {
     mode = { "n", "t" },
     desc = "Clear output",
   },
+  r = {
+    callback = function()
+      require("integrations.overseer.restart").from_output()
+    end,
+    mode = "n",
+    desc = "Restart task",
+  },
   t = {
     callback = function()
       require("integrations.overseer.tasklist_toggle").toggle_from_output()

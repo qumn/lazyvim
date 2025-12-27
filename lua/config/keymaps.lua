@@ -5,7 +5,15 @@
 require("config.norman")
 
 -- tabs
-vim.keymap.set("n", "<leader>tn", "<cmd>tab split | only<cr>", {
+vim.keymap.set("n", "<leader>tn", function()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local is_overseer = vim.bo[bufnr].filetype == "OverseerList" or vim.b[bufnr].overseer_task ~= nil
+  vim.cmd("tab split")
+  if is_overseer then
+    vim.t.overseer_allow_solo = true
+  end
+  vim.cmd("only")
+end, {
   desc = "Open current window buffer fullscreen in a new tab (keep current layout)",
 })
 vim.keymap.set("n", "<leader>to", "<cmd>tabnext<cr>", { desc = "Next Tab" })

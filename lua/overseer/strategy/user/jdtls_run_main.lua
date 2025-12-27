@@ -191,6 +191,43 @@ local function pick_main_class(options, current_file, cb)
   end)
 end
 
+local function build_restart_params(task, strategy)
+  local params = task.metadata and task.metadata.jdtls_run_main_params or nil
+  if type(params) ~= "table" then
+    params = task.from_template and task.from_template.params or nil
+  end
+  if type(params) ~= "table" then
+    params = {
+      full_build = false,
+      continue_on_error = "always",
+      open_qf_on_error = true,
+      args = vim.deepcopy(strategy.args or {}),
+      vm_args = vim.deepcopy(strategy.vm_args or {}),
+      enable_preview = strategy.enable_preview or false,
+      cwd = task.cwd or strategy.cwd,
+      main = strategy.main,
+    }
+  end
+  return type(params) == "table" and params or nil
+end
+
+local function get_template_name(task)
+  if task.metadata and type(task.metadata.jdtls_run_main_template) == "string" then
+    return task.metadata.jdtls_run_main_template
+  end
+  if task.from_template and type(task.from_template.name) == "string" then
+    return task.from_template.name
+  end
+  return "Java: Run Main"
+end
+
+local function open_task_output(task_id, _)
+  local ok_window, window = pcall(require, "overseer.window")
+  if ok_window then
+    window.open({ direction = "bottom", enter = false, focus_task_id = task_id })
+  end
+end
+
 function JdtlsRunMain.new(opts)
   opts = opts or {}
   local strategy = {
@@ -288,6 +325,22 @@ function JdtlsRunMain:start(task)
 
   local hint_bufnr = self.bufnr_hint or vim.api.nvim_get_current_buf()
   local file_path = vim.api.nvim_buf_get_name(hint_bufnr)
+  if task and task.metadata and type(task.metadata.jdtls_run_main_params) ~= "table" then
+    local params = {}
+    if task.from_template and type(task.from_template.params) == "table" then
+      params = vim.deepcopy(task.from_template.params)
+    end
+    params.cwd = params.cwd or task.cwd or self.cwd
+    params.args = params.args or vim.deepcopy(self.args or {})
+    params.vm_args = params.vm_args or vim.deepcopy(self.vm_args or {})
+    if params.enable_preview == nil then
+      params.enable_preview = self.enable_preview or false
+    end
+    if params.main == nil and self.main then
+      params.main = vim.deepcopy(self.main)
+    end
+    task.metadata.jdtls_run_main_params = params
+  end
 
   if not self.bufnr or not vim.api.nvim_buf_is_valid(self.bufnr) then
     self.bufnr = vim.api.nvim_create_buf(false, true)
@@ -320,6 +373,13 @@ function JdtlsRunMain:start(task)
         append_lines(task, self.bufnr, { "canceled" })
         task:stop()
         return
+      end
+      self.main = vim.deepcopy(pick)
+      if task.metadata and type(task.metadata.jdtls_run_main_params) == "table" then
+        task.metadata.jdtls_run_main_params.main = vim.deepcopy(pick)
+      end
+      if task.from_template and type(task.from_template.params) == "table" then
+        task.from_template.params.main = vim.deepcopy(pick)
       end
 
       local short = pick.mainClass:match("([^.]+)$") or pick.mainClass
@@ -481,6 +541,49 @@ function JdtlsRunMain:start(task)
       task:on_exit(1)
     end
   end)
+end
+
+function JdtlsRunMain:restart(task)
+  local params = build_restart_params(task, self)
+  if not params then
+    return false
+  end
+  local ok_overseer, overseer = pcall(require, "overseer")
+  if not ok_overseer then
+    return false
+  end
+  if task.status and task.status ~= "PENDING" then
+    pcall(task.stop, task)
+  end
+  overseer.run_task(
+    {
+      name = get_template_name(task),
+      params = vim.deepcopy(params),
+      first = true,
+      autostart = true,
+      search_params = {
+        dir = task.cwd or vim.fn.getcwd(),
+        filetype = "java",
+      },
+    },
+    function(new_task)
+      if not new_task then
+        return
+      end
+      local ok_sidebar, sidebar = pcall(require, "overseer.task_list.sidebar")
+      if ok_sidebar then
+        local sb = sidebar.get_or_create()
+        sb:focus_task_id(new_task.id)
+      end
+      vim.api.nvim_exec_autocmds("User", {
+        pattern = "OverseerListTaskHover",
+        modeline = false,
+        data = { task_id = new_task.id },
+      })
+      open_task_output(new_task.id, task.cwd)
+    end
+  )
+  return true
 end
 
 function JdtlsRunMain:stop()

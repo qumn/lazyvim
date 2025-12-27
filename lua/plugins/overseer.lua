@@ -28,15 +28,11 @@ return {
     local overseer = require("overseer")
     require("integrations.overseer.color_output").setup()
     local function clear_task_output()
-      local ok, sidebar = pcall(require, "overseer.task_list.sidebar")
-      if not ok then
+      local ok_view, TaskView = pcall(require, "overseer.task_view")
+      if not ok_view or not TaskView.task_under_cursor then
         return
       end
-      local sb = sidebar.get()
-      if not sb then
-        return
-      end
-      local task = sb:get_task_from_line()
+      local task = TaskView.task_under_cursor
       if not task then
         return
       end
@@ -93,6 +89,12 @@ return {
           ["<C-j>"] = false,
           ["<C-k>"] = false,
           ["<C-l>"] = { callback = clear_task_output, mode = "n", desc = "Clear task output" },
+          ["r"] = {
+            callback = function()
+              require("integrations.overseer.restart").from_tasklist()
+            end,
+            desc = "Restart task",
+          },
         },
       },
       component_aliases = {

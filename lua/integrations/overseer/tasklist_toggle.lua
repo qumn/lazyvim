@@ -62,6 +62,13 @@ local function find_output_win(task_id)
   return fallback
 end
 
+local function get_task_under_cursor()
+  local ok_view, TaskView = pcall(require, "overseer.task_view")
+  if ok_view then
+    return TaskView.task_under_cursor
+  end
+end
+
 function M.toggle_from_tasklist()
   local list_win = get_task_list_win()
   if not list_win or not vim.api.nvim_win_is_valid(list_win) then
@@ -74,14 +81,8 @@ function M.toggle_from_tasklist()
   end
 
   local task_id
-  local ok_sidebar, sidebar = pcall(require, "overseer.task_list.sidebar")
-  if ok_sidebar then
-    local sb = sidebar.get()
-    if sb then
-      local task = sb:get_task_from_line()
-      task_id = task and task.id or nil
-    end
-  end
+  local task = get_task_under_cursor()
+  task_id = task and task.id or nil
 
   hide_list(list_win, state)
 
