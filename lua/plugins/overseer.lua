@@ -79,7 +79,12 @@ return {
           ["{"] = "keymap.prev_task",
           ["}"] = "keymap.next_task",
 
-          ["t"] = "<CMD>OverseerQuickAction open tab<CR>",
+          ["t"] = {
+            callback = function()
+              require("integrations.overseer.tasklist_toggle").toggle_from_tasklist()
+            end,
+            desc = "Toggle task list",
+          },
 
           ["<C-u>"] = "keymap.scroll_output_up",
           ["<C-d>"] = "keymap.scroll_output_down",

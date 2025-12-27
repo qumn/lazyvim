@@ -43,6 +43,13 @@ local default_keymaps = {
     mode = { "n", "t" },
     desc = "Clear output",
   },
+  t = {
+    callback = function()
+      require("integrations.overseer.tasklist_toggle").toggle_from_output()
+    end,
+    mode = { "n", "t" },
+    desc = "Toggle task list",
+  },
 }
 
 ---@param bufnr integer
