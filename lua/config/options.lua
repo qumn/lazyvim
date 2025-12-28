@@ -13,6 +13,7 @@ vim.g.gui_font_size = vim.g.gui_font_default_size
 vim.g.gui_font_face = "CaskaydiaCove Nerd Font"
 vim.g.jumpoptions = "stack"
 vim.g.snacks_animate = false
+vim.g.overseer_exit_wait_ms = 0
 
 -- vim.g.root_spec =
 --   { "lsp", { ".git", "lua", "Cargo.toml", "pom.xml", "build.gradle", "go.mod", "package.json", "node_modules" }, "cwd" }

@@ -27,6 +27,7 @@ return {
   config = function()
     local overseer = require("overseer")
     require("integrations.overseer.color_output").setup()
+    require("integrations.overseer.exit_cleanup").setup()
     local function clear_task_output()
       local ok_view, TaskView = pcall(require, "overseer.task_view")
       if not ok_view or not TaskView.task_under_cursor then
