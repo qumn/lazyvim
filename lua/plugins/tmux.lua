@@ -16,10 +16,10 @@ return {
     map("n", "<C-S-I>", require("smart-splits").resize_up)
     map("n", "<C-S-O>", require("smart-splits").resize_right)
 
-    map("n", "<leader><leader>y", require("smart-splits").swap_buf_left)
-    map("n", "<leader><leader>n", require("smart-splits").swap_buf_down)
-    map("n", "<leader><leader>i", require("smart-splits").swap_buf_up)
-    map("n", "<leader><leader>o", require("smart-splits").swap_buf_right)
+    map("n", "<C-w>y", require("smart-splits").swap_buf_left)
+    map("n", "<C-w>n", require("smart-splits").swap_buf_down)
+    map("n", "<C-w>i", require("smart-splits").swap_buf_up)
+    map("n", "<C-w>o", require("smart-splits").swap_buf_right)
 
     -- Resize
     local submode = require("submode")
