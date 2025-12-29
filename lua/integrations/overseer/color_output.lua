@@ -65,11 +65,41 @@ local function build_script_command(shell, cmd, args)
   end
 end
 
-local function wrap_with_script(shell, task_defn)
-  -- `script` allocates a PTY so CLI tools emit ANSI colors in non-terminal buffers.
-  if vim.fn.executable("script") ~= 1 then
+local function require_executable(cmd, hint)
+  if vim.fn.executable(cmd) == 1 then
     return
   end
+  if hint and hint ~= "" then
+    error(string.format("overseer color_output: `%s` is required (%s)", cmd, hint))
+  end
+  error(string.format("overseer color_output: `%s` is required", cmd))
+end
+
+local function strip_non_sgr_escapes(str)
+  if not str or str == "" then
+    return str
+  end
+
+  local sgr = {}
+  str = str:gsub("\27%[[0-9;]*m", function(seq)
+    sgr[#sgr + 1] = seq
+    return "\1SGR" .. tostring(#sgr) .. "\2"
+  end)
+
+  str = str:gsub("\27%][^\7]*\7", "")
+  str = str:gsub("\27%][^\27]*\27\\", "")
+  str = str:gsub("\27%[[0-9;?]*[@-~]", "")
+
+  str = str:gsub("\1SGR(%d+)\2", function(n)
+    return sgr[tonumber(n)] or ""
+  end)
+
+  return str
+end
+
+local function wrap_with_script(shell, task_defn)
+  -- `script` allocates a PTY so CLI tools emit ANSI colors in non-terminal buffers.
+  local script_path = vim.fn.exepath("script")
   local cmd = task_defn.cmd
   if not cmd then
     return
@@ -84,7 +114,7 @@ local function wrap_with_script(shell, task_defn)
   if not cmd_str or cmd_str == "" then
     return
   end
-  task_defn.cmd = { "script", "-q", "-e", "-c", cmd_str, "/dev/null" }
+  task_defn.cmd = { script_path ~= "" and script_path or "script", "-q", "-e", "-c", cmd_str, "/dev/null" }
   task_defn.args = nil
 end
 
@@ -104,7 +134,10 @@ end
 
 local function prepare_task_for_color(self, shell, task)
   if self.opts and self.opts.use_terminal == false then
-    wrap_with_script(shell, task)
+    if task.cmd and vim.fn.has("linux") == 1 then
+      require_executable("script", "install util-linux")
+      wrap_with_script(shell, task)
+    end
     ensure_color_env(task)
   end
 end
@@ -126,20 +159,23 @@ local function make_raw_line_iter(self)
   local function raw_line(str)
     return str:gsub("\r$", "")
   end
+  local function finalize_line(str)
+    return strip_non_sgr_escapes(raw_line(str))
+  end
   return function(data)
     local ret = {}
     local pending = self._raw_pending
     for i, chunk in ipairs(data) do
       if i == 1 then
         if chunk == "" then
-          table.insert(ret, pending)
+          table.insert(ret, finalize_line(pending))
           pending = ""
         else
           pending = pending .. raw_line(chunk)
         end
       else
         if not (data[1] == "" and i == 2) then
-          table.insert(ret, pending)
+          table.insert(ret, finalize_line(pending))
         end
         pending = raw_line(chunk)
       end
@@ -246,7 +282,7 @@ local function patch_jobstart(baleia, shell)
         local line_count = vim.api.nvim_buf_line_count(self.bufnr)
         local trail_wins = collect_trailing_wins(self.bufnr, line_count)
         local raw_lines = raw_line_iter(data)
-        raw_lines[#raw_lines + 1] = self._raw_pending
+        raw_lines[#raw_lines + 1] = strip_non_sgr_escapes(self._raw_pending)
         local start = math.max(line_count - 1, 0)
         write_baleia_lines(baleia, self.bufnr, start, line_count, raw_lines)
 
@@ -306,11 +342,7 @@ local function patch_jobstart(baleia, shell)
         on_stdout({ "" })
         if self.opts.use_terminal then
           if self.term_id then
-            pcall(
-              vim.api.nvim_chan_send,
-              self.term_id,
-              string.format("\r\n[Process exited %d]\r\n", c)
-            )
+            pcall(vim.api.nvim_chan_send, self.term_id, string.format("\r\n[Process exited %d]\r\n", c))
             vim.bo[self.bufnr].scrollback = vim.bo[self.bufnr].scrollback - 1
             vim.bo[self.bufnr].scrollback = vim.bo[self.bufnr].scrollback + 1
             util_mod.terminal_tail_hack(self.bufnr)

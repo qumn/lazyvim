@@ -3,6 +3,286 @@ local jdtls_bootstrap = require("overseer.strategy.user.jdtls_bootstrap")
 
 local JdtlsRunMain = {}
 
+local function resolve_stacktrace_java_file(cwd, class_name, file_name)
+  if not cwd or cwd == "" then
+    cwd = vim.fn.getcwd()
+  end
+
+  local pkg = class_name and class_name:match("^(.*)%.[^.]+$") or nil
+  local expected_suffix = file_name
+  if pkg and pkg ~= "" then
+    expected_suffix = pkg:gsub("%.", "/") .. "/" .. file_name
+  end
+
+  local candidates = vim.fs.find(file_name, { path = cwd, type = "file", limit = 50 })
+  if #candidates == 0 then
+    return nil
+  end
+  if #candidates == 1 then
+    return candidates[1]
+  end
+  for _, p in ipairs(candidates) do
+    if p:sub(-#expected_suffix) == expected_suffix then
+      return p
+    end
+  end
+  return candidates[1]
+end
+
+local function parse_java_stacktrace(lines, cwd)
+  local items = {}
+  local group_idx = 0
+  local group_label
+  local seen_frame = false
+  local pending_header_lines
+  local pending_header_emitted = false
+  local pending_is_caused_by = false
+  local last_item_valid = false
+  local resolved_cache = {}
+
+  for _, line in ipairs(lines or {}) do
+    local is_frame = line:match("^%s*at%s+") ~= nil
+    local is_caused_by = line:match("^%s*Caused by:") ~= nil
+    local is_ellipsis = line:match("^%s*%.%.%.%s+%d+%s+more%s*$") ~= nil
+    local looks_like_exception = not is_frame
+      and not is_caused_by
+      and (line:match("^%s*Exception in thread") ~= nil
+        or line:find("Exception", 1, true) ~= nil
+        or line:find("Error", 1, true) ~= nil
+        or line:find("Throwable", 1, true) ~= nil)
+    if looks_like_exception then
+      if group_label == nil or seen_frame then
+        group_idx = group_idx + 1
+      end
+      local max_len = 140
+      local trimmed = vim.trim(line)
+      if #trimmed > max_len then
+        trimmed = trimmed:sub(1, max_len - 1) .. "…"
+      end
+      group_label = string.format("%d: %s", group_idx, trimmed)
+      seen_frame = false
+      pending_header_lines = { vim.trim(line) }
+      pending_header_emitted = false
+      pending_is_caused_by = false
+    elseif is_caused_by then
+      if group_label then
+        pending_header_lines = { vim.trim(line) }
+        pending_header_emitted = false
+        pending_is_caused_by = true
+      end
+    elseif is_ellipsis then
+      if last_item_valid then
+        table.insert(items, { valid = 0, text = vim.trim(line) })
+      end
+    end
+
+    local fqn, file_name, lnum = line:match("^%s*at%s+([%w%.$_]+)%(([^:]+):(%d+)%)")
+    if fqn and file_name and lnum then
+      local class_name = fqn:match("^(.+)%.([^.]+)$")
+      local cache_key = tostring(class_name or "") .. "|" .. file_name
+      local resolved = resolved_cache[cache_key]
+      if resolved == nil then
+        resolved = resolve_stacktrace_java_file(cwd, class_name, file_name) or false
+        resolved_cache[cache_key] = resolved
+      end
+      if resolved == false then
+        resolved = nil
+      end
+      if resolved and (not cwd or cwd == "" or resolved:sub(1, #cwd) == cwd) then
+        if not group_label then
+          group_idx = group_idx + 1
+          group_label = string.format("%d: %s", group_idx, "Stacktrace")
+          pending_header_lines = nil
+          pending_header_emitted = false
+        end
+        if pending_header_lines and not pending_header_emitted then
+          table.insert(items, {
+            filename = resolved,
+            lnum = tonumber(lnum),
+            col = 1,
+            module = group_label,
+            type = "E",
+            text = table.concat(pending_header_lines, "\n"),
+            user_data = { jdtls_run_main_caused_by = pending_is_caused_by },
+          })
+          pending_header_emitted = true
+          last_item_valid = true
+        end
+        table.insert(items, {
+          filename = resolved,
+          lnum = tonumber(lnum),
+          col = 1,
+          module = group_label,
+          type = "E",
+          text = line,
+        })
+        seen_frame = true
+        last_item_valid = true
+      end
+    end
+  end
+
+  return items
+end
+
+local function move_to_next_caused_by(view, direction)
+  if not view or not (view.win and view.win.win and vim.api.nvim_win_is_valid(view.win.win)) then
+    return
+  end
+  local bufnr = view.win.buf
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(view.win.win)
+  local start = cursor[1]
+  local last = vim.api.nvim_buf_line_count(bufnr)
+
+  local function is_caused_by_row(row)
+    local info = view.renderer:at(row)
+    local item = info and info.item or nil
+    local qf = item and item.item or nil
+    local ud = qf and qf.user_data or nil
+    return info
+      and info.first_line
+      and ud
+      and type(ud) == "table"
+      and ud.jdtls_run_main_caused_by == true
+  end
+
+  local function scan(from, to, step)
+    for row = from, to, step do
+      if is_caused_by_row(row) then
+        vim.api.nvim_win_set_cursor(view.win.win, { row, 0 })
+        return true
+      end
+    end
+    return false
+  end
+
+  if direction > 0 then
+    if scan(start + 1, last, 1) then
+      return
+    end
+    scan(1, start - 1, 1)
+  else
+    if scan(start - 1, 1, -1) then
+      return
+    end
+    scan(last, start + 1, -1)
+  end
+end
+
+local function ensure_trouble_caused_by_keymaps(view)
+  if not view or not view.win or not view.win.buf then
+    return
+  end
+  local bufnr = view.win.buf
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  if vim.b[bufnr].jdtls_run_main_trouble_caused_by_maps then
+    return
+  end
+  vim.b[bufnr].jdtls_run_main_trouble_caused_by_maps = true
+
+  vim.keymap.set("n", "]c", function()
+    move_to_next_caused_by(view, 1)
+  end, { buffer = bufnr, silent = true, desc = "Next caused by" })
+  vim.keymap.set("n", "[c", function()
+    move_to_next_caused_by(view, -1)
+  end, { buffer = bufnr, silent = true, desc = "Prev caused by" })
+end
+
+local function open_trouble_quickfix()
+  local ok, trouble = pcall(require, "trouble")
+  if ok then
+    local view = trouble.open({
+      mode = "quickfix",
+      focus = true,
+      sort = {},
+      groups = {
+        { "item.module", format = "{item.module} {count}" },
+        { "filename", format = "{file_icon} {filename} {count}" },
+      },
+    })
+    if view and view.wait then
+      view:wait(function()
+        ensure_trouble_caused_by_keymaps(view)
+      end)
+    end
+    return
+  end
+  pcall(vim.cmd, "copen")
+end
+
+local set_run_main_quickfix
+
+local function hide_overseer_output_window(bufnr)
+  local win = vim.api.nvim_get_current_win()
+  if not win or not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  if vim.api.nvim_win_get_buf(win) ~= bufnr then
+    return
+  end
+  if #vim.api.nvim_list_wins() > 1 then
+    pcall(vim.api.nvim_win_close, win, true)
+    return
+  end
+  pcall(vim.cmd, "silent! keepalt buffer #")
+end
+
+local function ensure_jdtls_quickfix_keymap(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  if vim.b[bufnr].jdtls_run_main_quickfix_keymap then
+    return
+  end
+  vim.b[bufnr].jdtls_run_main_quickfix_keymap = true
+
+  vim.keymap.set("n", "<C-q>", function()
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+      return
+    end
+    pcall(vim.cmd, "silent! OverseerClose")
+    hide_overseer_output_window(bufnr)
+    if not vim.b[bufnr].jdtls_run_main_qf_nr then
+      pcall(set_run_main_quickfix, nil, bufnr)
+    end
+    local qf_nr = vim.b[bufnr].jdtls_run_main_qf_nr
+    if not qf_nr then
+      return
+    end
+    pcall(vim.cmd, tostring(qf_nr) .. "chistory")
+    open_trouble_quickfix()
+  end, { buffer = bufnr, silent = true, desc = "Open run main quickfix in Trouble" })
+end
+
+set_run_main_quickfix = function(task, bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  local cwd = (task and task.cwd) or vim.b[bufnr].jdtls_run_main_cwd or vim.fn.getcwd()
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local items = parse_java_stacktrace(lines, cwd)
+  if #items == 0 then
+    return
+  end
+
+  local prev_nr = vim.fn.getqflist({ nr = 0 }).nr
+  local name = (task and task.name) or vim.b[bufnr].jdtls_run_main_name or "task"
+  local title = string.format("jdtls run main: %s", name)
+  vim.fn.setqflist({}, " ", { title = title, items = items })
+  local info = vim.fn.getqflist({ nr = 0, id = 0 })
+  vim.b[bufnr].jdtls_run_main_qf_nr = info.nr
+  vim.b[bufnr].jdtls_run_main_qf_id = info.id
+  if prev_nr and prev_nr ~= info.nr then
+    pcall(vim.cmd, tostring(prev_nr) .. "chistory")
+  end
+end
+
 local function set_lines(task, bufnr, lines)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
     return
@@ -478,6 +758,22 @@ function JdtlsRunMain:start(task)
                 end
                 if next_bufnr and vim.api.nvim_buf_is_valid(next_bufnr) then
                   task:dispatch("on_bufnr_changed", { prev = prev_bufnr, next = next_bufnr })
+                end
+                local qf_bufnr = next_bufnr or prev_bufnr
+                if qf_bufnr and vim.api.nvim_buf_is_valid(qf_bufnr) then
+                  vim.b[qf_bufnr].jdtls_run_main_cwd = task.cwd
+                  vim.b[qf_bufnr].jdtls_run_main_name = task.name
+                  ensure_jdtls_quickfix_keymap(qf_bufnr)
+                end
+                if task and not task.jdtls_run_main_quickfix_patched then
+                  task.jdtls_run_main_quickfix_patched = true
+                  local orig_on_exit = task.on_exit
+                  task.on_exit = function(t, code)
+                    if code ~= 0 then
+                      pcall(set_run_main_quickfix, t, qf_bufnr)
+                    end
+                    return orig_on_exit(t, code)
+                  end
                 end
                 self.bufnr = nil
               end)
