@@ -42,6 +42,7 @@ local function apply_everforest()
   local set = vim.fn["everforest#highlight"]
 
   set("DiffText", p.blue, p.bg5, "bold")
+  vim.api.nvim_set_hl(0, "@function.method.call", { italic = true })
 end
 
 vim.api.nvim_create_autocmd("ColorScheme", {

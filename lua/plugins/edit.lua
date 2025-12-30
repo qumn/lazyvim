@@ -87,7 +87,15 @@ return {
           -- Allow snacks_dashboard to be main even with buftype=nofile.
           local bt = vim.bo[buf].buftype
           if bt ~= "" then
-            return bt == "nofile" and vim.bo[buf].filetype == "snacks_dashboard"
+            if bt ~= "nofile" then
+              return false
+            end
+            local ft = vim.bo[buf].filetype
+            if ft == "snacks_dashboard" then
+              return true
+            end
+            local name = vim.api.nvim_buf_get_name(buf)
+            return name:match("^jdt://") ~= nil or name:match("^jar:") ~= nil or name:match("^zipfile:") ~= nil
           end
           return true
         end
