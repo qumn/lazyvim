@@ -2,6 +2,15 @@ local M = {}
 
 local module_index_cache = {}
 
+local function safe_cmd(cmd)
+  if type(cmd) ~= "string" or cmd == "" then
+    return
+  end
+  pcall(function()
+    vim.cmd(cmd)
+  end)
+end
+
 local function read_file(path)
   local ok, lines = pcall(vim.fn.readfile, path)
   if not ok or type(lines) ~= "table" then
@@ -25,14 +34,14 @@ local function path_exists(path)
 end
 
 local function get_repo_root(cwd)
-  if not cwd or cwd == "" then
-    cwd = vim.fn.getcwd()
+  local lv = rawget(_G, "LazyVim")
+  if lv and lv.root and type(lv.root.get) == "function" then
+    local ok, root = pcall(lv.root.get, { normalize = true })
+    if ok and type(root) == "string" and root ~= "" then
+      return root
+    end
   end
-  local found = vim.fs.find(".git", { upward = true, path = cwd })[1]
-  if found then
-    return vim.fs.dirname(found)
-  end
-  return cwd
+  return (cwd and cwd ~= "") and cwd or vim.fn.getcwd()
 end
 
 local function normalize_module_path(m)
@@ -79,7 +88,11 @@ local function parse_gradle_settings(repo_root)
   content = strip_comments(content)
 
   local project_dir_map = {}
-  for proj, dir in content:gmatch("project%s*%(%s*['\"](:[^'\"]+)['\"]%s*%)%s*%.%s*projectDir%s*=%s*file%s*%(%s*['\"]([^'\"]+)['\"]%s*%)") do
+  for proj, dir in
+    content:gmatch(
+      "project%s*%(%s*['\"](:[^'\"]+)['\"]%s*%)%s*%.%s*projectDir%s*=%s*file%s*%(%s*['\"]([^'\"]+)['\"]%s*%)"
+    )
+  do
     project_dir_map[proj] = dir
   end
 
@@ -255,10 +268,12 @@ local function parse_stacktrace_structure(lines, src_bufnr)
 
     local looks_like_exception = not is_frame
       and not is_caused_by
-      and (line:match("^%s*Exception in thread") ~= nil
+      and (
+        line:match("^%s*Exception in thread") ~= nil
         or trimmed:match("^[%w%.$_]+Exception[:%s]") ~= nil
         or trimmed:match("^[%w%.$_]+Error[:%s]") ~= nil
-        or trimmed:match("^[%w%.$_]+Throwable[:%s]") ~= nil)
+        or trimmed:match("^[%w%.$_]+Throwable[:%s]") ~= nil
+      )
 
     if looks_like_exception then
       if group_label == nil or seen_frame then
@@ -307,7 +322,14 @@ local function parse_stacktrace_structure(lines, src_bufnr)
       end
     end
 
-    if group_label and in_block and trimmed ~= "" and not looks_like_exception and not is_caused_by and not is_ellipsis then
+    if
+      group_label
+      and in_block
+      and trimmed ~= ""
+      and not looks_like_exception
+      and not is_caused_by
+      and not is_ellipsis
+    then
       local is_indented = line:match("^%s+") ~= nil
       local treat_as_continuation = (not seen_frame) or is_indented or is_frame or is_suppressed
       if treat_as_continuation and not is_frame then
@@ -437,10 +459,7 @@ local function ensure_trouble_caused_by_keymaps(view)
   end
 
   local function pick_jdtls_client()
-    local clients = vim.lsp.get_clients and vim.lsp.get_clients({ name = "jdtls" }) or {}
-    if not clients or #clients == 0 then
-      clients = vim.lsp.get_active_clients and vim.lsp.get_active_clients() or {}
-    end
+    local clients = vim.lsp.get_clients({ name = "jdtls" })
     for _, c in ipairs(clients) do
       if c and c.name == "jdtls" then
         return c
@@ -449,19 +468,30 @@ local function ensure_trouble_caused_by_keymaps(view)
     return nil
   end
 
+  local function show_location(client, loc)
+    if not (client and loc) then
+      return false
+    end
+    local enc = client.offset_encoding or "utf-16"
+    local show_document = vim.lsp.util.show_document
+    if type(show_document) == "function" then
+      show_document(loc, enc, { reuse_win = true, focus = true })
+      return true
+    end
+    return false
+  end
+
   local function jump_to_location_like(client, loc)
     if not client or not loc then
       return false
     end
     if loc.uri and loc.range then
-      vim.lsp.util.jump_to_location(loc, client.offset_encoding or "utf-16", true)
-      return true
+      return show_location(client, loc)
     end
     if type(loc) == "table" and #loc > 0 then
       local first = loc[1]
       if first and first.uri and first.range then
-        vim.lsp.util.jump_to_location(first, client.offset_encoding or "utf-16", true)
-        return true
+        return show_location(client, first)
       end
     end
     return false
@@ -474,17 +504,17 @@ local function ensure_trouble_caused_by_keymaps(view)
     if qf.filename and qf.filename ~= "" then
       return true
     end
-    local bufnr = qf.bufnr
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) and not vim.b[bufnr].stacktrace_scratch then
-      if not vim.api.nvim_buf_is_loaded(bufnr) then
-        local name = vim.api.nvim_buf_get_name(bufnr)
+    local qf_bufnr = qf.bufnr
+    if qf_bufnr and vim.api.nvim_buf_is_valid(qf_bufnr) and not vim.b[qf_bufnr].stacktrace_scratch then
+      if not vim.api.nvim_buf_is_loaded(qf_bufnr) then
+        local name = vim.api.nvim_buf_get_name(qf_bufnr)
         if name:match("^jdt://") ~= nil or name:match("^jar:") ~= nil or name:match("^zipfile:") ~= nil then
           return false
         end
         return true
       end
       local wanted = tonumber(qf.lnum) or 1
-      local last = vim.api.nvim_buf_line_count(bufnr)
+      local last = vim.api.nvim_buf_line_count(qf_bufnr)
       return last >= math.max(wanted, 1)
     end
     return false
@@ -499,52 +529,59 @@ local function ensure_trouble_caused_by_keymaps(view)
     return false
   end
 
-  local function ensure_local_buffer_highlighting(titem, qf)
+  local function preview_item_in_main(titem)
+    if not (titem and view and view.preview) then
+      return
+    end
+    view:preview(titem)
+  end
+
+  local function jump_item(titem)
+    if not (titem and view and view.jump) then
+      return
+    end
+    local qf = titem and titem.item or nil
     local filename = qf and qf.filename or nil
-    if type(filename) ~= "string" or filename == "" then
+    if type(filename) == "string" and filename ~= "" and vim.fn.filereadable(filename) == 1 then
+      local win = get_main_win()
+      if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_call(win, function()
+          safe_cmd("normal! m'")
+        end)
+        vim.api.nvim_set_current_win(win)
+      end
+
+      safe_cmd("silent! keepalt keepjumps edit " .. vim.fn.fnameescape(filename))
+
+      local pos = titem.pos or { qf and qf.lnum or 1, 0 }
+      local lnum = tonumber(pos[1]) or 1
+      local col = tonumber(pos[2]) or 0
+      local last = vim.api.nvim_buf_line_count(0)
+      lnum = math.min(math.max(lnum, 1), math.max(last, 1))
+      pcall(vim.api.nvim_win_set_cursor, 0, { lnum, col })
+      safe_cmd("norm! zzzv")
       return
     end
-    if vim.fn.filereadable(filename) ~= 1 then
+
+    pcall(view.jump, view, titem)
+  end
+
+  local function run_view_action(action, titem)
+    if action == "preview" then
+      if view.preview then
+        close_preview_if_open()
+        preview_item_in_main(titem)
+        if view.win and view.win.focus then
+          view.win:focus()
+        end
+      end
       return
     end
-    local buf = qf.bufnr
-    if not (buf and vim.api.nvim_buf_is_valid(buf)) then
-      buf = vim.fn.bufadd(filename)
-      qf.bufnr = buf
-      if titem then
-        titem.buf = buf
+    if action == "jump" then
+      if view.jump then
+        jump_item(titem)
       end
     end
-    if not (buf and vim.api.nvim_buf_is_valid(buf)) then
-      return
-    end
-    if vim.b[buf].stacktrace_filetype_bootstrap == true then
-      return
-    end
-
-    if vim.api.nvim_buf_is_loaded(buf) and (vim.bo[buf].filetype == nil or vim.bo[buf].filetype == "") then
-      pcall(vim.api.nvim_exec_autocmds, "BufReadPost", { buffer = buf, modeline = false })
-    end
-
-    local ft = nil
-    if filename:sub(-5) == ".java" then
-      ft = "java"
-    elseif vim.filetype and vim.filetype.match then
-      ft = vim.filetype.match({ filename = filename, buf = buf })
-    end
-    if ft and ft ~= "" and (vim.bo[buf].filetype == nil or vim.bo[buf].filetype == "") then
-      vim.bo[buf].filetype = ft
-      pcall(vim.api.nvim_exec_autocmds, "FileType", { buffer = buf, modeline = false })
-    end
-
-    local final_ft = vim.bo[buf].filetype
-    if final_ft and final_ft ~= "" and vim.treesitter and vim.treesitter.start then
-      local ok_lang, ts_lang = pcall(vim.treesitter.language.get_lang, final_ft)
-      if ok_lang and ts_lang and ts_lang ~= "" then
-        pcall(vim.treesitter.start, buf, ts_lang)
-      end
-    end
-    vim.b[buf].stacktrace_filetype_bootstrap = true
   end
 
   local function set_preview_for_current_item()
@@ -555,8 +592,7 @@ local function ensure_trouble_caused_by_keymaps(view)
     local item = at and at.item or nil
     local qf = item and item.item or nil
     if item and can_preview_item(qf) and view.preview then
-      ensure_local_buffer_highlighting(item, qf)
-      view:preview(item)
+      preview_item_in_main(item)
       return
     end
     close_preview_if_open()
@@ -651,25 +687,27 @@ local function ensure_trouble_caused_by_keymaps(view)
     end
 
     local cmds = client.server_capabilities
-      and client.server_capabilities.executeCommandProvider
-      and client.server_capabilities.executeCommandProvider.commands
+        and client.server_capabilities.executeCommandProvider
+        and client.server_capabilities.executeCommandProvider.commands
       or {}
 
-    local candidates = {}
-    for _, c in ipairs(cmds or {}) do
-      if type(c) == "string" and c:lower():find("opentype", 1, true) then
-        table.insert(candidates, c)
+    local function pick_command()
+      for _, c in ipairs(cmds or {}) do
+        if type(c) == "string" and c:lower():find("opentype", 1, true) then
+          return c
+        end
       end
-    end
-    if #candidates == 0 then
       for _, c in ipairs(cmds or {}) do
         local lower = type(c) == "string" and c:lower() or ""
         if lower ~= "" and lower:find("open", 1, true) and lower:find("type", 1, true) then
-          table.insert(candidates, c)
+          return c
         end
       end
+      return nil
     end
-    if #candidates == 0 then
+
+    local command = pick_command()
+    if not command then
       done(false)
       return
     end
@@ -677,22 +715,20 @@ local function ensure_trouble_caused_by_keymaps(view)
     local arg_variants = {
       { class_name },
       { { className = class_name } },
-      { { fullyQualifiedName = class_name } },
     }
 
-    local function try_cmd(i, j)
-      if i > #candidates then
+    local function try_variant(j)
+      if j > #arg_variants then
         done(false)
         return
       end
-      if j > #arg_variants then
-        try_cmd(i + 1, 1)
-        return
-      end
 
-      client.request("workspace/executeCommand", { command = candidates[i], arguments = arg_variants[j] }, function(err, result)
-        vim.schedule(function()
-          if not err and result then
+      client.request(
+        "workspace/executeCommand",
+        { command = command, arguments = arg_variants[j] },
+        function(err, result)
+          vim.schedule(function()
+            if not err and result then
               if win and vim.api.nvim_win_is_valid(win) then
                 vim.api.nvim_set_current_win(win)
               end
@@ -704,13 +740,14 @@ local function ensure_trouble_caused_by_keymaps(view)
                 done(true, target_buf, target_lnum)
                 return
               end
-          end
-          try_cmd(i, j + 1)
-        end)
-      end)
+            end
+            try_variant(j + 1)
+          end)
+        end
+      )
     end
 
-    try_cmd(1, 1)
+    try_variant(1)
   end
 
   local function current_view_item()
@@ -730,13 +767,24 @@ local function ensure_trouble_caused_by_keymaps(view)
     end
     class_name = class_name:gsub("%$.*$", "")
     local exec_started = false
-    local pkg = class_name:match("^(.*)%.[^.]+$") or ""
     local simple = class_name:match("([^.]+)$") or class_name
     if simple == "" then
       return false
     end
 
     local expected_path = class_name:gsub("%.", "/") .. ".java"
+
+    local function on_opened(loc)
+      if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_set_current_win(win)
+      end
+      show_location(client, loc)
+      local target_buf = vim.api.nvim_get_current_buf()
+      local target_lnum = move_cursor_to_stacktrace_pos(win, ud.lnum, ud.method)
+      update_qf_item_after_open(qf, target_buf, target_lnum)
+      update_trouble_item_after_open(titem, target_buf, target_lnum)
+      run_view_action(action, titem)
+    end
 
     local function normalize_loc(loc)
       if not loc or type(loc) ~= "table" then
@@ -763,32 +811,19 @@ local function ensure_trouble_caused_by_keymaps(view)
         local loc = normalize_loc(sym and sym.location or nil)
         local uri = loc and loc.uri or nil
         if uri then
-          local name = sym and sym.name or ""
-          local container = sym and sym.containerName or ""
-
           local score = 0
-          if name == class_name then
-            score = score + 200
-          elseif name == simple then
-            score = score + 140
-          elseif name:sub(-(#simple + 1)) == "." .. simple then
-            score = score + 120
-          elseif name:find(simple, 1, true) then
-            score = score + 30
-          end
-
-          if container == pkg then
-            score = score + 60
-          elseif container ~= "" and pkg ~= "" and container:find(pkg, 1, true) then
-            score = score + 20
-          end
-
           if uri:find(expected_path, 1, true) then
+            score = score + 300
+          elseif uri:sub(-(#simple + 5)) == (simple .. ".java") then
             score = score + 200
           elseif uri:find(simple .. ".java", 1, true) then
-            score = score + 50
+            score = score + 150
+          elseif uri:sub(-(#simple + 6)) == (simple .. ".class") then
+            score = score + 100
           elseif uri:find(simple .. ".class", 1, true) then
-            score = score + 25
+            score = score + 80
+          else
+            score = score + 10
           end
 
           if score > 0 and (not best or score > best.score) then
@@ -799,13 +834,9 @@ local function ensure_trouble_caused_by_keymaps(view)
       return best and best.loc or nil
     end
 
-    local seen_q = {}
-    local queries = {}
-    for _, q in ipairs({ class_name, pkg .. "." .. simple, simple }) do
-      if q and q ~= "" and not seen_q[q] then
-        seen_q[q] = true
-        table.insert(queries, q)
-      end
+    local queries = { class_name }
+    if simple ~= class_name then
+      table.insert(queries, simple)
     end
 
     local function try_query(i)
@@ -815,15 +846,7 @@ local function ensure_trouble_caused_by_keymaps(view)
           try_open_type_via_execute_command(client, qf, class_name, win, function(ok2, target_buf, target_lnum)
             if ok2 then
               update_trouble_item_after_open(titem, target_buf, target_lnum)
-              if action == "preview" and view.preview then
-                close_preview_if_open()
-                pcall(view.preview, view, titem)
-                if view.win and view.win.focus then
-                  view.win:focus()
-                end
-              elseif action == "jump" and view.jump then
-                pcall(view.jump, view, titem)
-              end
+              run_view_action(action, titem)
             end
           end)
         end
@@ -841,23 +864,7 @@ local function ensure_trouble_caused_by_keymaps(view)
             return
           end
 
-          if win and vim.api.nvim_win_is_valid(win) then
-            vim.api.nvim_set_current_win(win)
-          end
-          vim.lsp.util.jump_to_location(loc, client.offset_encoding or "utf-16", true)
-          local target_buf = vim.api.nvim_get_current_buf()
-          local target_lnum = move_cursor_to_stacktrace_pos(win, ud.lnum, ud.method)
-          update_qf_item_after_open(qf, target_buf, target_lnum)
-          update_trouble_item_after_open(titem, target_buf, target_lnum)
-          if action == "preview" and view.preview then
-            close_preview_if_open()
-            pcall(view.preview, view, titem)
-            if view.win and view.win.focus then
-              view.win:focus()
-            end
-          elseif action == "jump" and view.jump then
-            pcall(view.jump, view, titem)
-          end
+          on_opened(loc)
         end)
       end)
     end
@@ -933,8 +940,7 @@ local function ensure_trouble_caused_by_keymaps(view)
       return
     end
     if view.preview then
-      ensure_local_buffer_highlighting(item, qf)
-      view:preview(item)
+      preview_item_in_main(item)
     end
   end, { buffer = bufnr, silent = true, nowait = true, desc = "Preview stacktrace item" })
 
@@ -948,8 +954,7 @@ local function ensure_trouble_caused_by_keymaps(view)
       return
     end
     if can_preview_item(qf) and view.jump then
-      ensure_local_buffer_highlighting(item, qf)
-      pcall(view.jump, view, item)
+      jump_item(item)
     end
   end, { buffer = bufnr, silent = true, nowait = true, desc = "Open stacktrace item" })
 end
@@ -1034,7 +1039,7 @@ local function open_trouble_quickfix(opts)
       focus = true,
       follow = false,
       auto_preview = false,
-      preview = { type = "main", scratch = false },
+      preview = { type = "main", scratch = true },
       formatters = {
         stacktrace_text = function(ctx)
           local qf = ctx and ctx.item and ctx.item.item or nil
@@ -1104,7 +1109,7 @@ local function open_trouble_quickfix(opts)
     end
     return
   end
-  pcall(vim.cmd, "copen")
+  safe_cmd("copen")
 end
 
 local function hide_output_window(bufnr)
@@ -1119,7 +1124,7 @@ local function hide_output_window(bufnr)
     pcall(vim.api.nvim_win_close, win, true)
     return
   end
-  pcall(vim.cmd, "silent! keepalt buffer #")
+  safe_cmd("silent! keepalt buffer #")
 end
 
 local function bkey(ns, suffix)
@@ -1190,7 +1195,7 @@ function M.build_quickfix(opts)
   vim.b[bufnr][bkey(ns, "qf_last_line_count")] = vim.api.nvim_buf_line_count(bufnr)
   vim.b[bufnr][bkey(ns, "qf_changedtick")] = vim.api.nvim_buf_get_changedtick(bufnr)
   if prev_nr and prev_nr ~= info.nr then
-    pcall(vim.cmd, tostring(prev_nr) .. "chistory")
+    safe_cmd(tostring(prev_nr) .. "chistory")
   end
 
   return #items
@@ -1221,12 +1226,12 @@ function M.build_and_open(opts)
     local qf_nr = vim.b[bufnr][bkey(ns, "qf_nr")]
     if qf_nr then
       if opts.close_overseer ~= false then
-        pcall(vim.cmd, "silent! OverseerClose")
+        safe_cmd("silent! OverseerClose")
       end
       if opts.hide_output_window ~= false then
         hide_output_window(bufnr)
       end
-      pcall(vim.cmd, tostring(qf_nr) .. "chistory")
+      safe_cmd(tostring(qf_nr) .. "chistory")
       open_trouble_quickfix({ cursor_lnum = cursor_lnum, cursor_line = cursor_line })
       return 1
     end
@@ -1243,13 +1248,13 @@ function M.build_and_open(opts)
   end
 
   if opts.close_overseer ~= false then
-    pcall(vim.cmd, "silent! OverseerClose")
+    safe_cmd("silent! OverseerClose")
   end
   if opts.hide_output_window ~= false then
     hide_output_window(bufnr)
   end
 
-  pcall(vim.cmd, tostring(qf_nr) .. "chistory")
+  safe_cmd(tostring(qf_nr) .. "chistory")
   open_trouble_quickfix({ cursor_lnum = cursor_lnum, cursor_line = cursor_line })
   return built
 end
