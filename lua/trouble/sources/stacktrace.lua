@@ -1,8 +1,6 @@
 ---@diagnostic disable: inject-field
 local Actions = require("trouble.config.actions")
-local Item = require("trouble.item")
 local Preview = require("trouble.view.preview")
-local Util = require("trouble.util")
 
 ---@class trouble.Source.stacktrace.session
 ---@field id string
@@ -69,7 +67,7 @@ local function jump_edit(view, item)
   end
 
   local filename = item and item.filename or nil
-  if can_edit_file(filename) then
+  if type(filename) == "string" and filename ~= "" and vim.fn.filereadable(filename) == 1 then
     vim.api.nvim_win_call(win, function()
       vim.cmd("normal! m'")
     end)
@@ -86,7 +84,7 @@ local function jump_edit(view, item)
     return true
   end
 
-  if view and view.jump then
+  if item and item.buf and vim.api.nvim_buf_is_valid(item.buf) and view and view.jump then
     pcall(view.jump, view, item)
     return true
   end
@@ -209,6 +207,80 @@ local function move_to_caused_by(view, direction)
   end
 end
 
+local function move_to_exception_group(view, direction)
+  if not view or not view.win or not view.win.win or not vim.api.nvim_win_is_valid(view.win.win) then
+    return
+  end
+  local bufnr = view.win.buf
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(view.win.win)
+  local start = cursor[1]
+  local last = vim.api.nvim_buf_line_count(bufnr)
+
+  local function is_group_row(row)
+    local info = view.renderer and view.renderer:at(row) or nil
+    local node = info and info.first_line and info.node or nil
+    return node and node.group ~= nil
+  end
+
+  local function is_item_row(row)
+    local info = view.renderer and view.renderer:at(row) or nil
+    return info and info.first_line and info.item ~= nil
+  end
+
+  local function current_group_row()
+    for row = start, 1, -1 do
+      if is_group_row(row) then
+        return row
+      end
+    end
+    return nil
+  end
+
+  local function first_item_row_in_group(group_row)
+    if not group_row then
+      return nil
+    end
+    for row = group_row + 1, last do
+      if is_group_row(row) then
+        return nil
+      end
+      if is_item_row(row) then
+        return row
+      end
+    end
+    return nil
+  end
+
+  local function scan(from, to, step)
+    for row = from, to, step do
+      if is_group_row(row) then
+        local item_row = first_item_row_in_group(row) or row
+        pcall(vim.api.nvim_win_set_cursor, view.win.win, { item_row, 0 })
+        return true
+      end
+    end
+    return false
+  end
+
+  local base = current_group_row() or start
+
+  if direction > 0 then
+    if scan(base + 1, last, 1) then
+      return
+    end
+    scan(1, base - 1, 1)
+  else
+    if scan(base - 1, 1, -1) then
+      return
+    end
+    scan(last, base + 1, -1)
+  end
+end
+
 M.config = {
   modes = {
     stacktrace = {
@@ -218,9 +290,8 @@ M.config = {
       follow = false,
       auto_preview = true,
       preview = { type = "main", scratch = true },
-      title = "{hl:Title}Stacktrace{hl} {count}",
       groups = {
-        { "item.module", format = "{item.module} {count}" },
+        { "item.module", format = "{hl:Title}{item.module}{hl} {count}" },
       },
       sort = {
         function(item)
@@ -280,6 +351,18 @@ M.config = {
           end,
           desc = "Next caused by",
         },
+        ["[e"] = {
+          action = function(view)
+            move_to_exception_group(view, -1)
+          end,
+          desc = "Prev exception",
+        },
+        ["]e"] = {
+          action = function(view)
+            move_to_exception_group(view, 1)
+          end,
+          desc = "Next exception",
+        },
         ["<cr>"] = {
           action = function(view, ctx)
             local item = ctx and ctx.item or nil
@@ -287,6 +370,9 @@ M.config = {
               return Actions.jump(view, ctx)
             end
             sanitize_item(item)
+            if not is_frame(item) then
+              return
+            end
             suppress_preview(400)
             if Preview.is_open() then
               Preview.close()
@@ -406,7 +492,7 @@ function M.open(opts)
   if type(opts) == "string" then
     opts = { mode = opts }
   end
-  local id = opts.id or opts.session_id or "stacktrace"
+  local id = opts.id or opts["session_id"] or "stacktrace"
   M.set(id, opts.items or {}, opts.meta)
   opts.params = vim.tbl_extend("force", opts.params or {}, { id = id })
   opts.mode = opts.mode or "stacktrace"

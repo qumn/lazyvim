@@ -1,6 +1,6 @@
 local util = require("overseer.util")
 local jdtls_bootstrap = require("overseer.strategy.user.jdtls_bootstrap")
-local stacktrace_qf = require("integrations.overseer.stacktrace_quickfix")
+local stacktrace_qf = require("integrations.overseer.stacktrace.trouble")
 
 local JdtlsRunMain = {}
 
