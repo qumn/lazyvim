@@ -65,8 +65,10 @@ return {
       config = function()
         local main = require("trouble.view.main")
         local preview = require("trouble.view.preview")
+        local telescope_source = require("trouble.sources.telescope")
 
-        -- HACK: override Trouble main-window detection for snacks_dashboard.
+        -- Trouble rejects buftype=nofile as "main"; allow snacks_dashboard and URI buffers to be treated as main.
+        ---@diagnostic disable-next-line: duplicate-set-field
         main._valid = function(win, buf)
           if not win or not buf then
             return false
@@ -95,9 +97,50 @@ return {
               return true
             end
             local name = vim.api.nvim_buf_get_name(buf)
-            return name:match("^jdt://") ~= nil or name:match("^jar:") ~= nil or name:match("^zipfile:") ~= nil
+            return name:match("^jdt:") ~= nil or name:match("^jar:") ~= nil or name:match("^zipfile:") ~= nil
           end
           return true
+        end
+
+        -- Some code paths collapse `//` in filenames, turning `jdt://...` into `jdt:/...`.
+        -- nvim-jdtls uses `BufReadCmd jdt://*`, so canonicalize JDT URIs to `jdt://...`.
+        local function canonical_jdt_uri(name)
+          if type(name) ~= "string" then
+            return nil
+          end
+          if not name:match("^jdt:") then
+            return nil
+          end
+          if name:match("^jdt://") then
+            return name
+          end
+          local rest = name:sub(5)
+          rest = rest:gsub("^/+", "")
+          return "jdt://" .. rest
+        end
+
+        local orig_item = telescope_source.item
+        -- Ensure JDT telescope items carry a stable `bufnr` so Trouble jump/preview doesn't treat the URI as a file path.
+        telescope_source.item = function(item)
+          local filename
+          if item.path then
+            filename = item.path
+          else
+            filename = item.filename
+            if item.cwd and filename then
+              filename = item.cwd .. "/" .. filename
+            end
+          end
+
+          local uri = canonical_jdt_uri(filename)
+          if uri then
+            item.path = uri
+            if not item.bufnr or item.bufnr <= 0 then
+              item.bufnr = vim.uri_to_bufnr(uri)
+            end
+          end
+
+          return orig_item(item)
         end
       end,
 

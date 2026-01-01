@@ -83,6 +83,9 @@ return {
         end)
       end
 
+      local jdtls_telescope = require("integrations.telescope.jdtls")
+      local qflist_previewer_with_jdt = jdtls_telescope.setup(builtin)
+
       return vim.tbl_extend("force", opts, {
         defaults = {
           theme = "ivy",
@@ -100,7 +103,7 @@ return {
           },
           file_previewer = require("telescope.previewers").vim_buffer_cat.new,
           grep_previewer = require("telescope.previewers").vim_buffer_vimgrep.new,
-          qflist_previewer = require("telescope.previewers").vim_buffer_qflist.new,
+          qflist_previewer = qflist_previewer_with_jdt,
           winblend = 0,
           path_display = {
             filename_first = {

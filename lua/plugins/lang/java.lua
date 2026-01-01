@@ -79,6 +79,12 @@ return {
       local extra = {
         settings = {
           java = {
+            eclipse = {
+              downloadSources = true,
+            },
+            maven = {
+              downloadSources = true,
+            },
             configuration = {
               runtimes = {
                 { name = "jdk8", path = java_home("1.8") },
