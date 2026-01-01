@@ -128,8 +128,21 @@ local function build_session(opts)
   end
 
   src.set(id, trouble_items, {
-    resolve_frame = function(view, item, action, done)
-      Jdtls.resolve_frame(view, item, action, done)
+    resolve_location = function(item, done)
+      local qf = item and item.item or nil
+      if qf then
+        Workspace.resolve_items_in_place({ qf }, cwd)
+        local ud = qf.user_data
+        if ud and type(ud) == "table" and ud.stacktrace_resolved == true and type(qf.filename) == "string" and qf.filename ~= "" then
+          item.filename = qf.filename
+          local lnum = tonumber(ud.lnum) or 1
+          item.pos = { lnum, 0 }
+          item.end_pos = item.pos
+          done(true)
+          return
+        end
+      end
+      Jdtls.resolve_location(item, done)
     end,
   })
 

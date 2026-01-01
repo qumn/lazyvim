@@ -2,6 +2,25 @@ local M = {}
 
 local module_index_cache = {}
 
+local function scandir_dirs(path)
+  local uv = vim.uv or vim.loop
+  local handle = uv and uv.fs_scandir and uv.fs_scandir(path) or nil
+  if not handle then
+    return {}
+  end
+  local dirs = {}
+  while true do
+    local name, t = uv.fs_scandir_next(handle)
+    if not name then
+      break
+    end
+    if t == "directory" and not name:match("^%.") then
+      table.insert(dirs, name)
+    end
+  end
+  return dirs
+end
+
 local function read_file(path)
   local ok, lines = pcall(vim.fn.readfile, path)
   if not ok or type(lines) ~= "table" then
@@ -165,26 +184,63 @@ local function build_source_roots(repo_root)
   return source_roots
 end
 
+local function build_package_prefixes(source_roots)
+  local prefixes = {}
+  for _, sr in ipairs(source_roots or {}) do
+    for _, d1 in ipairs(scandir_dirs(sr)) do
+      local p1 = vim.fs.joinpath(sr, d1)
+      for _, d2 in ipairs(scandir_dirs(p1)) do
+        prefixes[d1 .. "." .. d2] = true
+      end
+    end
+  end
+  local count = 0
+  for _ in pairs(prefixes) do
+    count = count + 1
+  end
+  return prefixes, count
+end
+
 local function get_module_index(repo_root)
   local cached = module_index_cache[repo_root]
   if cached then
     return cached
   end
+  local source_roots = build_source_roots(repo_root)
+  local prefixes, prefix_count = build_package_prefixes(source_roots)
   local index = {
     repo_root = repo_root,
-    source_roots = build_source_roots(repo_root),
+    source_roots = source_roots,
+    package_prefixes = prefixes,
+    package_prefix_count = prefix_count,
     resolve_cache = {},
   }
   module_index_cache[repo_root] = index
   return index
 end
 
-local function expected_java_suffix(class_name, file_name)
+local function expected_java_fqn_relpath(class_name, file_name)
   local pkg = class_name and class_name:match("^(.*)%.[^.]+$") or nil
   if pkg and pkg ~= "" then
     return pkg:gsub("%.", "/") .. "/" .. file_name
   end
   return file_name
+end
+
+local function package_prefix2(class_name)
+  if type(class_name) ~= "string" or class_name == "" then
+    return nil
+  end
+  class_name = class_name:gsub("%$.*$", "")
+  local pkg = class_name:match("^(.*)%.[^.]+$") or nil
+  if not pkg or pkg == "" then
+    return nil
+  end
+  local a, b = pkg:match("^([%w_]+)%.([%w_]+)")
+  if not a or not b then
+    return nil
+  end
+  return a .. "." .. b
 end
 
 local function resolve_workspace_java_file(index, class_name, file_name)
@@ -195,21 +251,33 @@ local function resolve_workspace_java_file(index, class_name, file_name)
     return nil
   end
 
-  local suffix = expected_java_suffix(class_name, file_name)
-  local cached = index.resolve_cache[suffix]
+  local fqn_relpath = expected_java_fqn_relpath(class_name, file_name)
+  local cached = index.resolve_cache[fqn_relpath]
   if cached ~= nil then
     return cached == false and nil or cached
   end
 
+  local prefix2 = package_prefix2(class_name)
+  if
+    prefix2
+    and index.package_prefix_count
+    and index.package_prefix_count > 0
+    and index.package_prefixes
+    and not index.package_prefixes[prefix2]
+  then
+    index.resolve_cache[fqn_relpath] = false
+    return nil
+  end
+
   for _, sr in ipairs(index.source_roots or {}) do
-    local candidate = vim.fs.joinpath(sr, suffix)
+    local candidate = vim.fs.joinpath(sr, fqn_relpath)
     if path_exists(candidate) then
-      index.resolve_cache[suffix] = candidate
+      index.resolve_cache[fqn_relpath] = candidate
       return candidate
     end
   end
 
-  index.resolve_cache[suffix] = false
+  index.resolve_cache[fqn_relpath] = false
   return nil
 end
 
@@ -230,4 +298,3 @@ function M.resolve_items_in_place(items, cwd)
 end
 
 return M
-

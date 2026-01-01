@@ -1,5 +1,7 @@
 local M = {}
 
+M._cache = {}
+
 local function pick_jdtls_client()
   local clients = vim.lsp.get_clients({ name = "jdtls" })
   for _, c in ipairs(clients) do
@@ -123,6 +125,9 @@ local function open_type_via_execute_command(client, class_name, ud, titem, done
           if not err and result then
             local loc = normalize_loc(result) or (type(result) == "table" and normalize_loc(result[1]) or nil)
             if apply_resolved_location(loc, ud, titem) then
+              if loc then
+                M._cache[class_name] = loc
+              end
               done(true)
               return
             end
@@ -136,7 +141,7 @@ local function open_type_via_execute_command(client, class_name, ud, titem, done
   try_variant(1)
 end
 
-function M.resolve_frame(view, titem, action, done)
+function M.resolve_location(titem, done)
   done = done or function() end
   local qf = titem and titem.item or nil
   local ud = qf and qf.user_data or nil
@@ -163,10 +168,23 @@ function M.resolve_frame(view, titem, action, done)
     return
   end
 
+  local cached = M._cache[class_name]
+  if cached then
+    if apply_resolved_location(cached, ud, titem) then
+      done(true)
+      return
+    end
+    M._cache[class_name] = nil
+  end
+
   local expected_path = class_name:gsub("%.", "/") .. ".java"
 
   local function on_opened(loc)
     if apply_resolved_location(loc, ud, titem) then
+      local normalized = normalize_loc(loc)
+      if normalized then
+        M._cache[class_name] = normalized
+      end
       done(true)
     else
       done(false)
@@ -236,4 +254,3 @@ function M.resolve_frame(view, titem, action, done)
 end
 
 return M
-

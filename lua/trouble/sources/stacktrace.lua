@@ -113,9 +113,9 @@ local function needs_resolution(item)
   return true
 end
 
-local function resolve_frame(view, item, action, on_done)
+local function resolve_location(view, item, after, on_done)
   local session = get_session(view)
-  local resolver = session and session.meta and session.meta.resolve_frame or nil
+  local resolver = session and session.meta and session.meta.resolve_location or nil
   if type(resolver) ~= "function" then
     return false
   end
@@ -136,7 +136,7 @@ local function resolve_frame(view, item, action, on_done)
     end
   end
 
-  resolver(view, item, action, function(ok)
+  resolver(item, function(ok)
     if type(on_done) == "function" then
       pcall(on_done, ok)
     end
@@ -153,11 +153,11 @@ local function resolve_frame(view, item, action, on_done)
     if view and view.render then
       view:render()
     end
-    if action == "jump" then
+    if after == "jump" then
       jump_edit(view, item)
       return
     end
-    if action == "preview" and view and view.preview then
+    if after == "preview" and view and view.preview then
       view:preview(item)
     end
   end)
@@ -382,7 +382,7 @@ M.config = {
               if view and view.opts then
                 view.opts.auto_preview = false
               end
-              if resolve_frame(view, item, "jump", function()
+              if resolve_location(view, item, "jump", function()
                 if view and view.opts then
                   view.opts.auto_preview = prev
                 end
@@ -404,7 +404,7 @@ M.config = {
               return
             end
             sanitize_item(item)
-            if needs_resolution(item) and resolve_frame(view, item, "preview") then
+            if needs_resolution(item) and resolve_location(view, item, "preview") then
               return
             end
             Actions.preview(view, ctx)
