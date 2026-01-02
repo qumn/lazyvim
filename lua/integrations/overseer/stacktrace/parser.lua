@@ -62,18 +62,14 @@ function M.parse(lines)
         or trimmed:match("^[%w%.$_]+Throwable[:%s]") ~= nil
       )
 
-    if looks_like_exception then
-      if group_label == nil or seen_frame then
-        group_idx = group_idx + 1
-      end
-      local max_len = 140
-      if #trimmed > max_len then
-        trimmed = trimmed:sub(1, max_len - 1) .. "…"
-      end
-      group_label = string.format("%d: %s", group_idx, trimmed)
-      seen_frame = false
-      in_block = true
-    elseif is_caused_by then
+	    if looks_like_exception then
+	      if group_label == nil or seen_frame then
+	        group_idx = group_idx + 1
+	      end
+	      group_label = string.format("%d: %s", group_idx, trimmed)
+	      seen_frame = false
+	      in_block = true
+	    elseif is_caused_by then
       if group_label then
         in_block = true
         seen_frame = false

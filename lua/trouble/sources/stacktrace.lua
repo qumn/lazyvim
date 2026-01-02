@@ -290,6 +290,13 @@ M.config = {
       follow = false,
       auto_preview = true,
       preview = { type = "main", scratch = true },
+      win = {
+        wo = {
+          wrap = true,
+          linebreak = true,
+          breakindent = true,
+        },
+      },
       groups = {
         { "item.module", format = "{hl:Title}{item.module}{hl} {count}" },
       },

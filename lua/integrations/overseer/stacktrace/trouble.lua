@@ -187,7 +187,12 @@ function M.build_and_open(opts)
         if opts.hide_output_window ~= false then
           hide_output_window(bufnr)
         end
-        local view = trouble.open({ mode = "stacktrace", focus = true, params = { id = session_id } })
+        local view = trouble.open({
+          mode = "stacktrace",
+          focus = true,
+          params = { id = session_id },
+          win = { wo = { wrap = true, linebreak = true, breakindent = true } },
+        })
         if view and view.wait then
           view:wait(function()
             if cursor_lnum and cursor_line and Parser.looks_like_stacktrace_line(cursor_line) then
@@ -217,7 +222,12 @@ function M.build_and_open(opts)
     hide_output_window(bufnr)
   end
 
-  local view = trouble.open({ mode = "stacktrace", focus = true, params = { id = id } })
+  local view = trouble.open({
+    mode = "stacktrace",
+    focus = true,
+    params = { id = id },
+    win = { wo = { wrap = true, linebreak = true, breakindent = true } },
+  })
   if view and view.wait then
     view:wait(function()
       if cursor_lnum and cursor_line and Parser.looks_like_stacktrace_line(cursor_line) then
