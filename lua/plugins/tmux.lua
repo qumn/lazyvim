@@ -5,21 +5,24 @@ return {
   enable = not vim.g.neovide,
   init = function()
     local map = vim.keymap.set
-    map("n", "<C-y>", require("smart-splits").move_cursor_left)
-    map("n", "<C-n>", require("smart-splits").move_cursor_down)
-    map("n", "<C-i>", require("smart-splits").move_cursor_up)
-    map("n", "<C-o>", require("smart-splits").move_cursor_right)
-    map("n", "<C-\\>", require("smart-splits").move_cursor_previous)
+    -- stylua: ignore start
+    map({ "n", "t" },   "<C-y>",   require("smart-splits").move_cursor_left,     { desc = "Move to left split" })
+    map({ "n", "t" },   "<C-n>",   require("smart-splits").move_cursor_down,     { desc = "Move to down split" })
+    map({ "n", "t" },   "<C-i>",   require("smart-splits").move_cursor_up,       { desc = "Move to up split" })
+    map({ "n", "t" },   "<C-o>",   require("smart-splits").move_cursor_right,    { desc = "Move to right split" })
+    map({ "n", "t" },   "<C-\\>",  require("smart-splits").move_cursor_previous, { desc = "Move to previous split" })
+    map("t",   "<Tab>", [[<Tab>]], { desc = "Keep Tab is Tab" })
 
-    map("n", "<C-S-Y>", require("smart-splits").resize_left)
-    map("n", "<C-S-N>", require("smart-splits").resize_down)
-    map("n", "<C-S-I>", require("smart-splits").resize_up)
-    map("n", "<C-S-O>", require("smart-splits").resize_right)
+    map({ "n", "t" },   "<C-S-Y>", require("smart-splits").resize_left,          { desc = "Resize split left" })
+    map({ "n", "t" },   "<C-S-N>", require("smart-splits").resize_down,          { desc = "Resize split down" })
+    map({ "n", "t" },   "<C-S-I>", require("smart-splits").resize_up,            { desc = "Resize split up" })
+    map({ "n", "t" },   "<C-S-O>", require("smart-splits").resize_right,         { desc = "Resize split right" })
 
-    map("n", "<C-w>y", require("smart-splits").swap_buf_left)
-    map("n", "<C-w>n", require("smart-splits").swap_buf_down)
-    map("n", "<C-w>i", require("smart-splits").swap_buf_up)
-    map("n", "<C-w>o", require("smart-splits").swap_buf_right)
+    map({ "n", "t" },   "<C-w>y",  require("smart-splits").swap_buf_left,        { desc = "Swap buffer left" })
+    map({ "n", "t" },   "<C-w>n",  require("smart-splits").swap_buf_down,        { desc = "Swap buffer down" })
+    map({ "n", "t" },   "<C-w>i",  require("smart-splits").swap_buf_up,          { desc = "Swap buffer up" })
+    map({ "n", "t" },   "<C-w>o",  require("smart-splits").swap_buf_right,       { desc = "Swap buffer right" })
+    -- stylua: ignore end
 
     -- Resize
     local submode = require("submode")

@@ -5,7 +5,7 @@
 require("config.norman")
 
 -- tabs
-vim.keymap.set("n", "<leader>tn", function()
+vim.keymap.set({ "n", "t" }, "<leader>tn", function()
   local bufnr = vim.api.nvim_get_current_buf()
   local is_overseer = vim.bo[bufnr].filetype == "OverseerList" or vim.b[bufnr].overseer_task ~= nil
   vim.cmd("tab split")

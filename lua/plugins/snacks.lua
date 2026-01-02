@@ -29,10 +29,14 @@ return {
     terminal = {
       win = {
         keys = {
-          nav_h = { "<C-y>", term_nav("h"), desc = "Go to Left Window", expr = true, mode = "t" },
-          nav_j = { "<C-n>", term_nav("j"), desc = "Go to Lower Window", expr = true, mode = "t" },
-          nav_k = { "<C-i>", term_nav("k"), desc = "Go to Upper Window", expr = true, mode = "t" },
-          nav_l = { "<C-o>", term_nav("l"), desc = "Go to Right Window", expr = true, mode = "t" },
+          -- nav_h = { "<C-y>", term_nav("h"), desc = "Go to Left Window", expr = true, mode = "t" },
+          -- nav_j = { "<C-n>", term_nav("j"), desc = "Go to Lower Window", expr = true, mode = "t" },
+          -- nav_k = { "<C-i>", term_nav("k"), desc = "Go to Upper Window", expr = true, mode = "t" },
+          -- nav_l = { "<C-o>", term_nav("l"), desc = "Go to Right Window", expr = true, mode = "t" },
+          nav_h = false,
+          nav_j = false,
+          nav_k = false,
+          nav_l = false,
           -- <C-i> equals <Tab> in terminals, so mapping only one affects both.
           -- Map them separately to keep <Tab> as <Tab>.
           tab = { "<Tab>", [[<Tab>]], desc = "Keep Tab is Tab", expr = true, mode = "t" },
