@@ -70,20 +70,32 @@ return {
           },
         },
       },
-      component_aliases = {
-        default_vscode = {
-          "default",
-          {
-            "open_output_keymaps",
-            direction = "dock",
-          },
-        },
-      },
     }
 
     require("integrations.overseer.color_output").setup()
     require("integrations.overseer.exit_cleanup").setup()
-    require("overseer").setup(opts)
+    local overseer = require("overseer")
+    overseer.setup(opts)
+    overseer.add_template_hook(nil, function(task_defn, util)
+      local existing
+      for _, comp in ipairs(task_defn.components or {}) do
+        if comp == "open_output_keymaps" then
+          existing = {}
+          break
+        end
+        if type(comp) == "table" and comp[1] == "open_output_keymaps" then
+          existing = vim.deepcopy(comp)
+          break
+        end
+      end
+      local conf = existing or { "open_output_keymaps" }
+      conf[1] = "open_output_keymaps"
+      conf.on_start = "always"
+      if conf.direction == nil then
+        conf.direction = "dock"
+      end
+      util.add_component(task_defn, conf)
+    end)
     require("integrations.overseer.bottom_dock").setup()
     require("integrations.overseer.taskview_patch").setup()
   end,
