@@ -5,7 +5,7 @@
 require("config.norman")
 
 -- tabs
-vim.keymap.set({ "n", "t" }, "<leader>tn", function()
+vim.keymap.set("n", "<leader>tn", function()
   local bufnr = vim.api.nvim_get_current_buf()
   local is_overseer = vim.bo[bufnr].filetype == "OverseerList" or vim.b[bufnr].overseer_task ~= nil
   vim.cmd("tab split")
@@ -20,8 +20,13 @@ vim.keymap.set("n", "<leader>to", "<cmd>tabnext<cr>", { desc = "Next Tab" })
 vim.keymap.set("n", "<leader>ty", "<cmd>tabprevious<cr>", { desc = "Previous Tab" })
 vim.keymap.set("n", "<leader>tq", "<cmd>tabclose<cr>", { desc = "Close Tab" })
 
-vim.keymap.set("v", "=", vim.lsp.buf.format, { silent = true })
-vim.keymap.set("n", "==", vim.lsp.buf.format, { silent = true })
+vim.keymap.set("v", "=", function()
+  require("conform").format({ lsp_fallback = false })
+end, { silent = true })
+
+vim.keymap.set("n", "==", function()
+  require("conform").format({ lsp_fallback = false })
+end, { silent = true })
 
 -- delete all marks for current line
 vim.keymap.set({ "n" }, "md", function()
