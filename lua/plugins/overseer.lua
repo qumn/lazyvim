@@ -13,6 +13,8 @@ return {
     require("integrations.overseer.watch_run").setup()
   end,
   config = function()
+    require("integrations.overseer.safe_win_jump").setup()
+
     local function clear_task_output()
       local ok_view, TaskView = pcall(require, "overseer.task_view")
       if not ok_view or not TaskView.task_under_cursor then
