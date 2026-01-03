@@ -5,31 +5,67 @@ local state = {
   hide = nil,
 }
 
-function M.owner()
-  return state.id
+local function clear()
+  state.id = nil
+  state.hide = nil
 end
 
-function M.clear(id)
-  if state.id == id then
-    state.id = nil
-    state.hide = nil
+local function safe_call(fn)
+  if type(fn) ~= "function" then
+    return true
   end
+  return pcall(fn)
 end
 
-function M.register(id, hide)
-  state.id = id
-  state.hide = hide
-end
+---@class integrations.layout.bottom.ToggleOpts
+---@field id string
+---@field open? fun()
+---@field hide fun()
+---@field is_open? fun(): boolean
+---@field claim? boolean
 
-function M.hide_other(id)
-  if not state.hide or state.id == id then
-    return
+---@param opts integrations.layout.bottom.ToggleOpts
+---@return boolean opened
+function M.toggle(opts)
+  if type(opts) ~= "table" or type(opts.id) ~= "string" or opts.id == "" then
+    return false
   end
-  local ok = pcall(state.hide)
-  if ok then
-    state.id = nil
-    state.hide = nil
+  if type(opts.hide) ~= "function" then
+    return false
   end
+
+  if state.id == opts.id then
+    if opts.claim then
+      state.hide = opts.hide
+      return true
+    end
+    if type(opts.is_open) == "function" then
+      local ok, open_now = pcall(opts.is_open)
+      if ok and not open_now then
+        clear()
+      else
+        safe_call(opts.hide)
+        clear()
+        return false
+      end
+    else
+      safe_call(opts.hide)
+      clear()
+      return false
+    end
+  end
+
+  safe_call(state.hide)
+  clear()
+
+  local ok = safe_call(opts.open)
+  if not ok then
+    return false
+  end
+
+  state.id = opts.id
+  state.hide = opts.hide
+  return true
 end
 
 return M

@@ -118,19 +118,13 @@ local bottom_owner_snacks = "snacks_terminal"
 local function hide_snacks_terminals()
   local ok, snacks = pcall(require, "snacks")
   if not ok or not snacks.terminal then
-    return false
+    return
   end
-  local hidden = false
   for _, term in ipairs(snacks.terminal.list() or {}) do
     if term:valid() and term.opts and term.opts.position == "bottom" then
       term:hide()
-      hidden = true
     end
   end
-  if hidden then
-    bottom.clear(bottom_owner_snacks)
-  end
-  return hidden
 end
 
 local function snacks_bottom_visible()
@@ -146,17 +140,21 @@ local function snacks_bottom_visible()
   return false
 end
 
-local function toggle_bottom_terminal()
-  if snacks_bottom_visible() then
-    hide_snacks_terminals()
+local function open_snacks_terminal()
+  local ok, snacks = pcall(require, "snacks")
+  if not ok or not snacks.terminal then
     return
   end
-  bottom.hide_other(bottom_owner_snacks)
-  local ok, snacks = pcall(require, "snacks")
-  if ok and snacks.terminal then
-    snacks.terminal()
-    bottom.register(bottom_owner_snacks, hide_snacks_terminals)
-  end
+  snacks.terminal()
+end
+
+local function toggle_bottom_terminal()
+  bottom.toggle({
+    id = bottom_owner_snacks,
+    open = open_snacks_terminal,
+    hide = hide_snacks_terminals,
+    is_open = snacks_bottom_visible,
+  })
 end
 
 vim.keymap.set({ "n", "t" }, "<C-/>", toggle_bottom_terminal, { desc = "Toggle bottom terminal" })

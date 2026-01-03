@@ -142,6 +142,8 @@ return {
 
           return orig_item(item)
         end
+
+        require("integrations.trouble.bottom_dock").setup()
       end,
 
       win = {
