@@ -90,9 +90,14 @@ return {
           break
         end
       end
+      local disable_auto_open = task_defn.metadata and task_defn.metadata.overseer_auto_open_output == false
       local conf = existing or { "open_output_keymaps" }
       conf[1] = "open_output_keymaps"
-      conf.on_start = "always"
+      if disable_auto_open then
+        conf.on_start = "never"
+      elseif conf.on_start == nil then
+        conf.on_start = "always"
+      end
       if conf.direction == nil then
         conf.direction = "dock"
       end
