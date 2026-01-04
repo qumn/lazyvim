@@ -18,10 +18,10 @@ return {
     map({ "n", "t" },   "<C-S-I>", require("smart-splits").resize_up,            { desc = "Resize split up" })
     map({ "n", "t" },   "<C-S-O>", require("smart-splits").resize_right,         { desc = "Resize split right" })
 
-    map({ "n", "t" },   "<C-w>y",  require("smart-splits").swap_buf_left,        { desc = "Swap buffer left" })
-    map({ "n", "t" },   "<C-w>n",  require("smart-splits").swap_buf_down,        { desc = "Swap buffer down" })
-    map({ "n", "t" },   "<C-w>i",  require("smart-splits").swap_buf_up,          { desc = "Swap buffer up" })
-    map({ "n", "t" },   "<C-w>o",  require("smart-splits").swap_buf_right,       { desc = "Swap buffer right" })
+    map({ "n" },   "<C-w>y",  require("smart-splits").swap_buf_left,        { desc = "Swap buffer left" })
+    map({ "n" },   "<C-w>n",  require("smart-splits").swap_buf_down,        { desc = "Swap buffer down" })
+    map({ "n" },   "<C-w>i",  require("smart-splits").swap_buf_up,          { desc = "Swap buffer up" })
+    map({ "n" },   "<C-w>o",  require("smart-splits").swap_buf_right,       { desc = "Swap buffer right" })
     -- stylua: ignore end
 
     -- Resize
