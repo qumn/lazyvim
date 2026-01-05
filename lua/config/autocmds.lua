@@ -36,25 +36,19 @@
 -- })
 
 local group = vim.api.nvim_create_augroup("custom_everforest_hl", { clear = true })
-local function apply_everforest()
-  local config = vim.fn["everforest#get_configuration"]()
-  local p = vim.fn["everforest#get_palette"](config.background, config.colors_override)
-  local set = vim.fn["everforest#highlight"]
-
-  set("DiffText", p.blue, p.bg5, "bold")
-  vim.api.nvim_set_hl(0, "@function.method.call", { italic = true })
-end
 
 vim.api.nvim_create_autocmd("ColorScheme", {
   group = group,
   pattern = "everforest",
   callback = function()
-    apply_everforest()
+    require("config.highlight").setup()
   end,
 })
 
 if vim.g.colors_name == "everforest" then
-  vim.schedule(apply_everforest)
+  vim.schedule(function()
+    require("config.highlight").setup()
+  end)
 end
 
 -- If a tab ends up with only Overseer panes, close the tab to avoid Overseer becoming the last window.
