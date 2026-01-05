@@ -88,3 +88,13 @@ vim.api.nvim_create_autocmd("WinClosed", {
     end)
   end,
 })
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "qf",
+  callback = function()
+    -- Unmap <CR> in quickfix window (if needed)
+    vim.keymap.set("n", "<CR>", "<CR>", { buffer = true, desc = "Default Enter in quickfix" })
+    -- Enable cursorline only in quickfix window
+    vim.opt_local.cursorline = true
+  end,
+})

@@ -3,8 +3,8 @@
 vim.cmd([[
   " === norman keyboard layout
   nnoremap <nowait> y h
-  " nnoremap n j
-  " nnoremap i k
+  nnoremap <nowait> n j
+  nnoremap <nowait> i k
   nnoremap <nowait> o l
 
   vnoremap <nowait> y h
@@ -73,18 +73,18 @@ vim.cmd([[
   " tmapclear
 ]])
 
-vim.keymap.set("n", "n", function()
-  if vim.v.count > 0 then
-    return "m'" .. vim.v.count .. "j"
-  else
-    return "gj"
-  end
-end, { noremap = true, expr = true })
-
-vim.keymap.set("n", "i", function()
-  if vim.v.count > 0 then
-    return "m'" .. vim.v.count .. "k"
-  else
-    return "gk"
-  end
-end, { noremap = true, expr = true })
+-- vim.keymap.set("n", "n", function()
+--   if vim.v.count > 0 then
+--     return "m'" .. vim.v.count .. "j"
+--   else
+--     return "gj"
+--   end
+-- end, { noremap = true, expr = true })
+--
+-- vim.keymap.set("n", "i", function()
+--   if vim.v.count > 0 then
+--     return "m'" .. vim.v.count .. "k"
+--   else
+--     return "gk"
+--   end
+-- end, { noremap = true, expr = true })

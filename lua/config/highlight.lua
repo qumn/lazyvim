@@ -93,7 +93,6 @@ function M.mod_hl(hl_name, opts)
 end
 
 function M.setup()
-  -- print("execute")
   for k, v in pairs(M.highlight) do
     M.mod_hl(k, v)
   end
