@@ -1,6 +1,24 @@
 return {
   {
     "nvim-telescope/telescope.nvim",
+    init = function()
+      local group = vim.api.nvim_create_augroup("UserTelescopeTabCi", { clear = true })
+      vim.api.nvim_create_autocmd("FileType", {
+        group = group,
+        pattern = "TelescopePrompt",
+        -- HACK: Telescope uses `nvim_replace_termcodes()` when applying mappings, so <C-i>/<Tab> can normalize to the same lhs.
+        -- Bind after `FileType TelescopePrompt` to keep them distinct in the prompt buffer.
+        callback = function(ev)
+          local actions = require("telescope.actions")
+          vim.keymap.set({ "i", "n" }, "<Tab>", function()
+            return actions.move_selection_next(ev.buf)
+          end, { buffer = ev.buf, silent = true })
+          vim.keymap.set({ "i", "n" }, "<C-i>", function()
+            return actions.move_selection_previous(ev.buf)
+          end, { buffer = ev.buf, silent = true })
+        end,
+      })
+    end,
     keys = {
       -- add a keymap to browse plugin files
       -- stylua: ignore
@@ -34,7 +52,6 @@ return {
         end)
       end
 
-      local prev = "<C-i>"
       local telescope_suffixes = require("integrations.telescope.suffixes").new(builtin)
 
       local jdtls_telescope = require("integrations.telescope.jdtls")
