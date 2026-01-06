@@ -1,3 +1,24 @@
+local function get_formatters(bufnr)
+  local filename = vim.api.nvim_buf_get_name(bufnr)
+  local ft = vim.filetype.match({ filename = filename })
+  if ft == nil or ft == "" or ft == "bigfile" then
+    return {}
+  end
+  local conform = require("conform")
+  local filetype_formatters = conform.formatters_by_ft[ft]
+  if type(filetype_formatters) == "function" then
+    local ok, resolved = pcall(filetype_formatters, bufnr)
+    if ok and type(resolved) == "table" then
+      return vim.deepcopy(resolved)
+    end
+    return {}
+  end
+  if type(filetype_formatters) == "table" then
+    return vim.deepcopy(filetype_formatters)
+  end
+  return {}
+end
+
 return {
   {
     "gbprod/yanky.nvim",
@@ -165,30 +186,23 @@ return {
   },
   {
     "stevearc/conform.nvim",
-    optional = true,
-    opts = function(_, opts)
-      opts.formatters_by_ft = opts.formatters_by_ft or {}
-      opts.formatters_by_ft.xml = { "xmllint" }
-      opts.formatters_by_ft.bigfile = function(bufnr)
-        local filename = vim.api.nvim_buf_get_name(bufnr)
-        local ft = vim.filetype.match({ filename = filename })
-        if ft == nil or ft == "" or ft == "bigfile" then
-          return {}
-        end
-        local conform = require("conform")
-        local filetype_formatters = conform.formatters_by_ft[ft]
-        if type(filetype_formatters) == "function" then
-          local ok, resolved = pcall(filetype_formatters, bufnr)
-          if ok and type(resolved) == "table" then
-            return vim.deepcopy(resolved)
-          end
-          return {}
-        end
-        if type(filetype_formatters) == "table" then
-          return vim.deepcopy(filetype_formatters)
-        end
-        return {}
-      end
-    end,
+    opts = {
+      formatters_by_ft = {
+        xml = { "xmllint" },
+        bigfile = get_formatters,
+        markdown = { "prettierd", "cbfmt" },
+      },
+    },
+  },
+  {
+    "mason-org/mason.nvim",
+    opts = {
+      ensure_installed = { "prettierd", "cbfmt" },
+      ui = {
+        keymaps = {
+          install_package = "r",
+        },
+      },
+    },
   },
 }
