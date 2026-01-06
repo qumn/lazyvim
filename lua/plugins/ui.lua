@@ -9,9 +9,17 @@ return {
       vim.g.everforest_disable_italic_comment = 1
     end,
   },
+
   {
-    "norcalli/nvim-colorizer.lua",
-    event = "VeryLazy",
+    "brenoprata10/nvim-highlight-colors",
+    event = "BufReadPre",
+    config = function()
+      require("nvim-highlight-colors").setup({
+        render = "background", -- "background" | "foreground" | "virtual"
+        enable_named_colors = false,
+        enable_tailwind = false,
+      })
+    end,
   },
   {
     "s1n7ax/nvim-window-picker",
