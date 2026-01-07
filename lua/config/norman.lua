@@ -68,6 +68,8 @@ vim.cmd([[
 
   xnoremap p pgvy
 
+  nnoremap s <Nop>
+
   " clear all mappings in select mode
   smapclear
   " tmapclear

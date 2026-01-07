@@ -2,12 +2,12 @@ return {
   {
     "nvim-telescope/telescope.nvim",
     init = function()
+      -- HACK: Telescope uses `nvim_replace_termcodes()` when applying mappings, so <C-i>/<Tab> can normalize to the same lhs.
+      -- Bind after `FileType TelescopePrompt` to keep them distinct in the prompt buffer.
       local group = vim.api.nvim_create_augroup("UserTelescopeTabCi", { clear = true })
       vim.api.nvim_create_autocmd("FileType", {
         group = group,
         pattern = "TelescopePrompt",
-        -- HACK: Telescope uses `nvim_replace_termcodes()` when applying mappings, so <C-i>/<Tab> can normalize to the same lhs.
-        -- Bind after `FileType TelescopePrompt` to keep them distinct in the prompt buffer.
         callback = function(ev)
           local actions = require("telescope.actions")
           vim.keymap.set({ "i", "n" }, "<Tab>", function()
@@ -36,6 +36,15 @@ return {
         "sb",
         "<CMD>Telescope buffers<CR>",
         desc = "Buffers",
+      },
+      {
+        "ss",
+        function()
+          require("telescope.builtin").lsp_document_symbols({
+            symbols = LazyVim.config.get_kind_filter(),
+          })
+        end,
+        desc = "Goto Symbol",
       },
     },
     opts = function(_, opts)
@@ -85,7 +94,6 @@ return {
             i = {
               ["<C-s>"] = actions.select_horizontal,
               ["<C-n>"] = actions.move_selection_next,
-              [prev] = actions.move_selection_previous,
               ["<C-q>"] = open_with_trouble_focus,
             },
             n = {
