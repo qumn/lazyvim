@@ -1,19 +1,8 @@
 return {
   {
-    "onsails/lspkind.nvim",
-    config = function()
-      -- setup lspkind for Copilot icon
-      require("lspkind").init({
-        symbol_map = {
-          Copilot = "",
-        },
-      })
-    end,
-  },
-  {
     "saghen/blink.cmp",
     dependencies = {
-      "onsails/lspkind.nvim",
+      "fang2hou/blink-copilot",
     },
     opts = {
       cmdline = {
@@ -62,6 +51,9 @@ return {
         ["<C-d>"] = { "scroll_documentation_down", "fallback" },
       },
       completion = {
+        ghost_text = {
+          enabled = true,
+        },
         list = {
           selection = {
             -- not preselect if snippet is active
@@ -107,15 +99,18 @@ return {
                   return ctx.kind .. space .. "[" .. ctx.source_name .. "]"
                 end,
               },
-              kind_icon = {
-                ellipsis = false,
-                text = function(ctx)
-                  return require("lspkind").symbolic(ctx.kind, {
-                    mode = "symbol",
-                  }) .. " "
-                end,
-              },
             },
+          },
+        },
+      },
+      sources = {
+        default = { "copilot", "lsp", "path", "snippets", "buffer" },
+        providers = {
+          copilot = {
+            name = "copilot",
+            module = "blink-copilot",
+            score_offset = 10000,
+            async = true,
           },
         },
       },
