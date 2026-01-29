@@ -1,9 +1,6 @@
 return {
   {
     "saghen/blink.cmp",
-    dependencies = {
-      "fang2hou/blink-copilot",
-    },
     opts = {
       cmdline = {
         keymap = {
@@ -100,17 +97,6 @@ return {
                 end,
               },
             },
-          },
-        },
-      },
-      sources = {
-        default = { "copilot", "lsp", "path", "snippets", "buffer" },
-        providers = {
-          copilot = {
-            name = "copilot",
-            module = "blink-copilot",
-            score_offset = 10000,
-            async = true,
           },
         },
       },
