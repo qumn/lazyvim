@@ -1,47 +1,6 @@
 -- Keep ANSI colors in Overseer output while storing clean text in non-terminal buffers.
 local M = {}
 
-local function patch_baleia_buffer()
-  -- Baleia writes to buffers; Overseer output buffers are non-modifiable.
-  local baleia_buffer = require("baleia.nvim.buffer")
-  if baleia_buffer._overseer_modifiable_patched then
-    return
-  end
-  baleia_buffer._overseer_modifiable_patched = true
-
-  local orig_set_lines = baleia_buffer.set_lines
-  baleia_buffer.set_lines = function(logger, buffer, start, end_, strict_indexing, lines)
-    if buffer and vim.api.nvim_buf_is_valid(buffer) then
-      local modifiable = vim.bo[buffer].modifiable
-      if not modifiable then
-        vim.bo[buffer].modifiable = true
-      end
-      local ret = orig_set_lines(logger, buffer, start, end_, strict_indexing, lines)
-      if not modifiable then
-        vim.bo[buffer].modifiable = false
-      end
-      return ret
-    end
-    return orig_set_lines(logger, buffer, start, end_, strict_indexing, lines)
-  end
-
-  local orig_set_text = baleia_buffer.set_text
-  baleia_buffer.set_text = function(logger, buffer, start_row, start_col, end_row, end_col, lines)
-    if buffer and vim.api.nvim_buf_is_valid(buffer) then
-      local modifiable = vim.bo[buffer].modifiable
-      if not modifiable then
-        vim.bo[buffer].modifiable = true
-      end
-      local ret = orig_set_text(logger, buffer, start_row, start_col, end_row, end_col, lines)
-      if not modifiable then
-        vim.bo[buffer].modifiable = false
-      end
-      return ret
-    end
-    return orig_set_text(logger, buffer, start_row, start_col, end_row, end_col, lines)
-  end
-end
-
 local function build_script_command(shell, cmd, args)
   if type(cmd) == "string" then
     if args ~= nil then
@@ -199,8 +158,17 @@ end
 
 local function write_baleia_lines(baleia, bufnr, start, end_, raw_lines)
   -- Baleia strips ANSI from text and adds highlights from the raw ANSI stream.
+  local modifiable = vim.bo[bufnr].modifiable
+  if not modifiable then
+    vim.bo[bufnr].modifiable = true
+  end
+
   baleia.buf_set_lines(bufnr, start, end_, true, raw_lines)
   vim.bo[bufnr].modified = false
+
+  if not modifiable then
+    vim.bo[bufnr].modifiable = false
+  end
 end
 
 local function update_trailing_cursors(util_mod, trail_wins, lnum, raw_line)
@@ -216,17 +184,12 @@ local function append_exit_line(baleia, bufnr, code)
   write_baleia_lines(baleia, bufnr, line_count, line_count, { string.format("[Process exited %d]", code), "" })
 end
 
-local function attach_baleia_autocmd(baleia)
+local function attach_baleia_autocmd()
   local baleia_group = vim.api.nvim_create_augroup("OverseerOutputBaleia", { clear = true })
   vim.api.nvim_create_autocmd("FileType", {
     group = baleia_group,
     pattern = "OverseerOutput",
     callback = function(args)
-      if not vim.b[args.buf].overseer_baleia_attached then
-        vim.b[args.buf].overseer_baleia_attached = true
-        baleia.automatically(args.buf)
-        baleia.once(args.buf)
-      end
       for _, lhs in ipairs({ "i", "I", "a", "A", "o", "O" }) do
         pcall(vim.keymap.del, "n", lhs, { buffer = args.buf })
       end
@@ -380,8 +343,7 @@ function M.setup()
   local baleia = require("baleia").setup({ strip_ansi_codes = true })
   local shell = require("overseer.shell")
 
-  patch_baleia_buffer()
-  attach_baleia_autocmd(baleia)
+  attach_baleia_autocmd()
   patch_jobstart(baleia, shell)
 end
 
