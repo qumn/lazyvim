@@ -10,17 +10,17 @@ return {
     end,
   },
 
-  {
-    "brenoprata10/nvim-highlight-colors",
-    event = "BufReadPre",
-    config = function()
-      require("nvim-highlight-colors").setup({
-        render = "background", -- "background" | "foreground" | "virtual"
-        enable_named_colors = false,
-        enable_tailwind = false,
-      })
-    end,
-  },
+  -- {
+  --   "brenoprata10/nvim-highlight-colors",
+  --   event = "BufReadPre",
+  --   config = function()
+  --     require("nvim-highlight-colors").setup({
+  --       render = "background", -- "background" | "foreground" | "virtual"
+  --       enable_named_colors = false,
+  --       enable_tailwind = false,
+  --     })
+  --   end,
+  -- },
   {
     "s1n7ax/nvim-window-picker",
     name = "window-picker",

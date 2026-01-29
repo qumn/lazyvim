@@ -155,8 +155,12 @@ return {
             -- stylua: ignore start
             { "n", "[h",        fns.smart_prev,                    { desc = "Go to previous hunk" } },
             { "n", "]h",        fns.smart_next,                    { desc = "Go to next hunk" } },
+            { "n", "<S-Tab>",   fns.smart_prev,                    { desc = "Go to previous hunk" } },
+            { "n", "<Tab>",     fns.smart_next,                    { desc = "Go to next hunk" } },
             { "n", "I",         fns.smart_prev,                    { desc = "Go to previous hunk" } },
             { "n", "N",         fns.smart_next,                    { desc = "Go to next hunk" } },
+            { "n", "[f",        actions.select_prev_entry,             { desc = "Go to previous hunk" } },
+            { "n", "]f",        actions.select_next_entry,             { desc = "Go to next hunk" } },
             { "n", "q",         actions.close,                     { desc = "Close Diffview" } },
             { "n", "<leader>e", actions.toggle_files,              { desc = "Toggle the file panel." } },
             { "n", "<c-u>",     actions.scroll_view(-0.25),        { desc = "Scroll the view up" } },
