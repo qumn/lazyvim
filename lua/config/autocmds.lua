@@ -98,3 +98,41 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.cursorline = true
   end,
 })
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "DiffviewViewClosed",
+  callback = function()
+    if vim.env.NVIM_DIFFVIEW_STANDALONE ~= "1" then
+      return
+    end
+
+    vim.schedule(function()
+      vim.cmd("qa")
+    end)
+  end,
+})
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "DiffviewViewOpened",
+  callback = function()
+    if vim.env.NVIM_DIFFVIEW_STANDALONE ~= "1" then
+      return
+    end
+
+    vim.schedule(function()
+      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if
+          vim.api.nvim_buf_is_valid(bufnr)
+          and vim.bo[bufnr].buflisted
+          and vim.bo[bufnr].buftype == ""
+          and vim.api.nvim_buf_get_name(bufnr) == ""
+          and not vim.bo[bufnr].modified
+          and vim.api.nvim_buf_line_count(bufnr) == 1
+          and vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
+        then
+          pcall(vim.api.nvim_buf_delete, bufnr, {})
+        end
+      end
+    end)
+  end,
+})
